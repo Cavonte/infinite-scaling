@@ -1,1 +1,1 @@
-# infinite-scaling
+# Sample Large Scale App
