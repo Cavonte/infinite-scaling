@@ -1,10 +1,10 @@
 # Infinite Scaling - TODO
 
 ## Phase 1: Project Setup
-- [ ] Initialize Node.js project with pnpm and TypeScript
-- [ ] Configure `tsconfig.json`, `tsx`, linting
-- [ ] Set up Docker Compose (PG primary + 2 replicas + Redis)
-- [ ] Verify all containers start and are reachable
+- [x] Initialize Node.js project with pnpm and TypeScript
+- [x] Configure `tsconfig.json`, `tsx`, linting
+- [x] Set up Docker Compose (PG primary + 2 replicas + Redis)
+- [x] Verify all containers start and are reachable
 
 ## Phase 2: Database Schema & ORM
 - [ ] Define Drizzle schema: `stores`, `products`, `orders`, `order_items`
