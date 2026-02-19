@@ -24,5 +24,7 @@ if [ -z "$(ls -A "$PGDATA" 2>/dev/null)" ]; then
   chmod 0700 "$PGDATA"
 fi
 
+chown -R postgres:postgres "$PGDATA"
+
 # Start postgres in standby mode
-exec postgres
+exec gosu postgres postgres

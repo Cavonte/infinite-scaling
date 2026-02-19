@@ -8,10 +8,20 @@ const app = new Hono();
 
 // Lazy connections — created on first health check
 let sql: postgres.Sql | null = null;
+let replica1: postgres.Sql | null = null;
+let replica2: postgres.Sql | null = null;
 let redis: IORedis | null = null;
 
 function getSQL() {
   return (sql ??= postgres(env.databaseUrl, { max: 1 }));
+}
+
+function getReplica1() {
+  return (replica1 ??= postgres(env.databaseUrlReplica1, { max: 1 }));
+}
+
+function getReplica2() {
+  return (replica2 ??= postgres(env.databaseUrlReplica2, { max: 1 }));
 }
 
 function getRedis() {
@@ -26,8 +36,16 @@ app.get("/health", (c) => {
 
 app.get("/health/db", async (c) => {
   try {
-    const result = await getSQL()`SELECT 1 as connected`;
-    return c.json({ status: "ok", result: result[0] });
+    const results = await Promise.allSettled(
+      [
+        getSQL()`SELECT 1 as connected`,
+        getReplica1()`SELECT 1 as connected`,
+        getReplica2()`SELECT 1 as connected`,
+
+      ]
+    )
+
+    return c.json({ status: "ok", result: results });
   } catch (err) {
     return c.json({ status: "error", message: String(err) }, 500);
   }
