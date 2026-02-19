@@ -7,20 +7,33 @@
 - [x] Verify all containers start and are reachable
 
 ## Phase 2: Database Schema & ORM
-- [ ] Define Drizzle schema: `stores`, `products`, `orders`, `order_items`
-- [ ] Configure drizzle-kit for migrations
-- [ ] Run initial migration against a single PG instance
-- [ ] Seed sample data (a few stores, products)
+- [x] Define Drizzle schema: `stores`, `products`, `orders`, `order_items`
+- [x] Configure drizzle-kit for migrations
+- [x] Run initial migration against a single PG instance
+- [x] Seed sample data (10k stores, 100k products, 2M orders, 6M order_items)
 
 ## Phase 3: Read Replicas
-- [ ] Configure PG streaming replication in Docker Compose (primary -> replicas)
+- [x] Configure PG streaming replication in Docker Compose (primary -> replicas)
 - [ ] Build `createRoutedDb()` decorator (reads -> replica, writes -> primary)
 - [ ] Implement round-robin load balancing across replicas
 - [ ] Handle read-your-own-writes (route to primary after recent write)
 - [ ] Test: verify reads hit replicas, writes hit primary
 - [ ] Failure scenario: kill a replica — does the router fall back gracefully?
 
-## Phase 4: Sharding
+## Phase 4: Redis — Cache-Aside
+- [ ] Implement cache-aside for product listings (GET /stores/:id/products)
+- [ ] Implement cache invalidation on product create/update/delete
+- [ ] Test: verify cache hit/miss behavior
+- [ ] Failure scenario: kill Redis — does the app degrade gracefully or crash?
+
+## Phase 4.5: Benchmark — Baseline vs Read Replicas vs Redis
+- [ ] Build `GET /stores/:id/products` endpoint (baseline — direct primary query)
+- [ ] Run k6 load test: baseline, record p50/p95/p99 latency + RPS
+- [ ] Enable read replica routing, re-run k6, compare
+- [ ] Enable Redis cache, re-run k6, compare
+- [ ] Document results: what improved, by how much, and why
+
+## Phase 5: Sharding
 - [ ] Create shard map config (store_id ranges -> PG connection strings)
 - [ ] Build `ShardRouter` class (resolves shard key to Drizzle instance)
 - [ ] Update Docker Compose to run multiple PG instances (2-3 shards)
@@ -29,13 +42,6 @@
 - [ ] Test: create stores on different shards, query correctly
 - [ ] Document: how cross-shard queries are handled (or explicitly not supported)
 - [ ] Failure scenario: take down one shard — what does the API return?
-
-## Phase 5: Redis — Cache-Aside
-- [ ] Set up ioredis connection
-- [ ] Implement cache-aside for product listings (GET /stores/:id/products)
-- [ ] Implement cache invalidation on product create/update/delete
-- [ ] Test: verify cache hit/miss behavior
-- [ ] Failure scenario: kill Redis — does the app degrade gracefully or crash?
 
 ## Phase 6: Redis — Session & Cart Storage
 - [ ] Implement cart storage in Redis (hash per cart, TTL expiry)
@@ -63,5 +69,4 @@
 - [ ] Add API documentation / route summary
 - [ ] Write README with architecture diagram and trade-offs per module
 - [ ] Prepare talking points for each scaling pattern (see system_design_drills.md)
-- [ ] Load test with multiple concurrent requests to demonstrate scaling
 - [ ] Document one real failure you encountered per phase and how you fixed it

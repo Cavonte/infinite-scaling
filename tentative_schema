@@ -1,0 +1,44 @@
+Schema
+
+Store:
+    ID
+    Name
+    Description
+    Category
+
+Product:
+    product_id
+    store(FK: store_id)
+    Name
+    Description
+    SKUS (1 to many skus)
+    Listed
+    Price
+
+SKU:
+    sku_id
+    Description
+    product(FK: product_id)
+    Supply
+
+User:
+    user_id
+    Name
+    Location
+    Orders(1 to many Orders)
+
+Order:
+    order_id
+    created_at
+    updated_at
+    Status
+    User(FK: user_id)
+    OrderItemms(1 to many Items)
+
+OrderItem
+    order_item_id
+    order(FK: order_id)
+    product(1 to 1, FK: product_id)
+    quantity
+    sku(FK: sku_id)
+    Price
