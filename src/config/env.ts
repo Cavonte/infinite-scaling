@@ -11,5 +11,7 @@ function optional(key: string, fallback: string): string {
 export const env = {
   port: Number(optional("PORT", "3000")),
   databaseUrl: required("DATABASE_URL"),
+  databaseUrlReplica1: required("DATABASE_URL_REPLICA_1"),
+  databaseUrlReplica2: required("DATABASE_URL_REPLICA_2"),
   redisUrl: required("REDIS_URL"),
 } as const;
