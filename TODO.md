@@ -14,8 +14,8 @@
 
 ## Phase 3: Read Replicas
 - [x] Configure PG streaming replication in Docker Compose (primary -> replicas)
-- [ ] Build `createRoutedDb()` decorator (reads -> replica, writes -> primary)
-- [ ] Implement round-robin load balancing across replicas
+- [x] Build `createRoutedDb()` decorator (reads -> replica, writes -> primary)
+- [x] Implement round-robin load balancing across replicas
 - [ ] Handle read-your-own-writes (route to primary after recent write)
 - [ ] Test: verify reads hit replicas, writes hit primary
 - [ ] Failure scenario: kill a replica — does the router fall back gracefully?
