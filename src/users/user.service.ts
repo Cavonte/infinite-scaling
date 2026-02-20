@@ -1,3 +1,4 @@
+import { features } from "../config/features.js";
 import {
 	userRepository,
 	type CreateUserInput,
@@ -9,15 +10,11 @@ export const userService = {
 		return userRepository.findAll();
 	},
 
-	async getUser(id: number) {
-		const user = await userRepository.findById(id);
-		if (!user) throw new Error(`User ${id} not found`);
-		return user;
-	},
-
-	async getUserFromPrimary(id: number) {
-		// read-your-own-writes: caller explicitly wants primary
-		const user = await userRepository.findByIdOnPrimary(id);
+	async getUser(id: number, forcePrimary = false) {
+		const user =
+			forcePrimary && features.readReplicas
+				? await userRepository.findByIdOnPrimary(id)
+				: await userRepository.findById(id);
 		if (!user) throw new Error(`User ${id} not found`);
 		return user;
 	},
@@ -28,6 +25,7 @@ export const userService = {
 	},
 
 	async updateUser(id: number, input: UpdateUserInput) {
+		// add more validation on input
 		const user = await userRepository.update(id, input);
 		if (!user) throw new Error(`User ${id} not found`);
 		return user;

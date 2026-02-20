@@ -44,6 +44,6 @@ Toggle via env vars or by editing defaults. All off = baseline mode.
 Uses raw `postgres` sql tags (not Drizzle query builder) in routes.
 
 ## Phases (current: Phase 3)
-1 ✅ Setup | 2 ✅ Schema+Seed | 3 🔄 Feature Flags | 4 Read Replicas | 5 Redis Cache
+1 ✅ Setup | 2 ✅ Schema+Seed | 3 ✅ Feature Flags | 4 ✅ Read Replicas | 5 🔄 Redis Cache
 5.5 Benchmark | 6 Sharding | 7-9 Redis (cart/rate/locks) | 10 Circuit Breaker
 11 k6 Benchmarks | 12 Polish

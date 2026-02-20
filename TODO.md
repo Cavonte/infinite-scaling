@@ -19,11 +19,11 @@
 
 ## Phase 4: Read Replicas
 - [x] Configure PG streaming replication in Docker Compose (primary -> replicas)
-- [x] Build `createRoutedDb()` decorator (reads -> replica, writes -> primary)
+- [x] Build `db_router.ts` module-level singleton (reads -> replica, writes -> primary)
 - [x] Implement round-robin load balancing across replicas
-- [ ] Handle read-your-own-writes (route to primary after recent write)
-- [ ] Test: verify reads hit replicas, writes hit primary
-- [ ] Failure scenario: kill a replica — does the router fall back gracefully?
+- [x] Handle read-your-own-writes (route to primary after recent write)
+- [x] Test: verify reads hit replicas, writes hit primary
+- [x] Failure scenario: kill a replica — does the router fall back gracefully?
 
 ## Phase 5: Redis — Cache-Aside
 - [ ] Set up ioredis connection
