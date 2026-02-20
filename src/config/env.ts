@@ -1,10 +1,10 @@
-function required(key: string): string {
+export function required(key: string): string {
 	const value = process.env[key];
 	if (!value) throw new Error(`Missing required env var: ${key}`);
 	return value;
 }
 
-function optional(key: string, fallback: string): string {
+export function optional(key: string, fallback: string): string {
 	return process.env[key] ?? fallback;
 }
 
