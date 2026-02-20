@@ -1,68 +1,46 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import postgres from "postgres";
 import { Redis as IORedis } from "ioredis";
 import { env } from "./config/env.js";
+import { db } from "./db/db_router.js";
 
 const app = new Hono();
 
 // Lazy connections — created on first health check
-let sql: postgres.Sql | null = null;
-let replica1: postgres.Sql | null = null;
-let replica2: postgres.Sql | null = null;
 let redis: IORedis | null = null;
 
-function getSQL() {
-  return (sql ??= postgres(env.databaseUrl, { max: 1 }));
-}
-
-function getReplica1() {
-  return (replica1 ??= postgres(env.databaseUrlReplica1, { max: 1 }));
-}
-
-function getReplica2() {
-  return (replica2 ??= postgres(env.databaseUrlReplica2, { max: 1 }));
-}
-
 function getRedis() {
-  return (redis ??= new IORedis(env.redisUrl, { lazyConnect: true }));
+	return (redis ??= new IORedis(env.redisUrl, { lazyConnect: true }));
 }
-
 
 app.get("/health", (c) => {
-  return c.json({ status: "ok" });
+	return c.json({ status: "ok" });
 });
-
 
 app.get("/health/db", async (c) => {
-  try {
-    const results = await Promise.allSettled(
-      [
-        getSQL()`SELECT 1 as connected`,
-        getReplica1()`SELECT 1 as connected`,
-        getReplica2()`SELECT 1 as connected`,
+	try {
+		const results = await Promise.allSettled([
+			db.write`SELECT 1 as connected`,
+			db.read`SELECT 1 as connected`,
+		]);
 
-      ]
-    )
-
-    return c.json({ status: "ok", result: results });
-  } catch (err) {
-    return c.json({ status: "error", message: String(err) }, 500);
-  }
+		return c.json({ status: "ok", result: results });
+	} catch (err) {
+		return c.json({ status: "error", message: String(err) }, 500);
+	}
 });
 
-
 app.get("/health/redis", async (c) => {
-  try {
-    const client = getRedis();
-    if (client.status === "wait") await client.connect();
-    const pong = await client.ping();
-    return c.json({ status: "ok", ping: pong });
-  } catch (err) {
-    return c.json({ status: "error", message: String(err) }, 500);
-  }
+	try {
+		const client = getRedis();
+		if (client.status === "wait") await client.connect();
+		const pong = await client.ping();
+		return c.json({ status: "ok", ping: pong });
+	} catch (err) {
+		return c.json({ status: "error", message: String(err) }, 500);
+	}
 });
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {
-  console.log(`Server running on http://localhost:${info.port}`);
+	console.log(`Server running on http://localhost:${info.port}`);
 });
