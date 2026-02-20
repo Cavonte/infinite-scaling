@@ -13,9 +13,9 @@
 - [x] Seed sample data (10k stores, 100k products, 2M orders, 6M order_items)
 
 ## Phase 3: Feature Flags & Config
-- [ ] Create `scalingConfig` object (sharding, readReplicas, redisCache, rateLimit, distributedLocks)
-- [ ] Wire flags into app so each layer checks its flag before routing
-- [ ] All flags default to `false` (baseline mode)
+- [x] Create `scalingConfig` object (sharding, readReplicas, redisCache, rateLimit, distributedLocks)
+- [x] Wire flags into app so each layer checks its flag before routing
+- [x] All flags default to `false` (baseline mode)
 
 ## Phase 4: Read Replicas
 - [x] Configure PG streaming replication in Docker Compose (primary -> replicas)
