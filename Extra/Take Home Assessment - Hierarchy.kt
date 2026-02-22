@@ -117,16 +117,94 @@ class ArrayBasedHierarchy(
 }
 
 class FilterTest {
+  // Kept original test for ref.
   @Test
   fun testFilter() {
     val unfiltered: Hierarchy = ArrayBasedHierarchy(
-      intArrayOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
-                                                    intArrayOf(0, 1, 2, 3, 1, 0, 1, 0, 1, 1, 2)
+      intArrayOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), intArrayOf(0, 1, 2, 3, 1, 0, 1, 0, 1, 1, 2)
     )
     val filteredActual: Hierarchy = unfiltered.filter { nodeId -> nodeId % 3 != 0 }
     val filteredExpected: Hierarchy = ArrayBasedHierarchy(
-      intArrayOf(1, 2, 5, 8, 10, 11),
-                                                          intArrayOf(0, 1, 1, 0, 1, 2)
+      intArrayOf(1, 2, 5, 8, 10, 11), intArrayOf(0, 1, 1, 0, 1, 2)
+    )
+
+    assertEquals(filteredExpected.formatString(), filteredActual.formatString())
+  }
+
+  @Test
+  fun `given a tree with a failing root should trim the entire tree`() {
+    // Root node 3 fails the predicate, so its entire subtree must be excluded
+    val unfiltered: Hierarchy = ArrayBasedHierarchy(
+      intArrayOf(3, 1, 2), intArrayOf(0, 1, 2)
+    )
+    val filteredActual: Hierarchy = unfiltered.filter { nodeId -> nodeId % 3 != 0 }
+    val filteredExpected: Hierarchy = ArrayBasedHierarchy(intArrayOf(), intArrayOf())
+
+    assertEquals(filteredExpected.formatString(), filteredActual.formatString())
+  }
+
+  @Test
+  fun `given a valid tree nodes should remain untouched`() {
+    // No node fails the predicate, output should equal input
+    val unfiltered: Hierarchy = ArrayBasedHierarchy(
+      intArrayOf(1, 2, 4), intArrayOf(0, 1, 2)
+    )
+    val filteredActual: Hierarchy = unfiltered.filter { nodeId -> nodeId % 3 != 0 }
+
+    assertEquals(unfiltered.formatString(), filteredActual.formatString())
+  }
+
+  @Test
+  fun `given an input with multiple roots only failing roots and branches should be trimmed`() {
+    // Root 1 (depth 0) -> child 2 (depth 1)
+    // Root 3 (depth 0) -> children 4, 5 -> Root 3 fails, so 3, 4, 5 are all excluded
+    val unfiltered: Hierarchy = ArrayBasedHierarchy(
+      intArrayOf(1, 2, 3, 4, 5), intArrayOf(0, 1, 0, 1, 1)
+    )
+    val filteredActual: Hierarchy = unfiltered.filter { nodeId -> nodeId % 3 != 0 }
+    val filteredExpected: Hierarchy = ArrayBasedHierarchy(
+      intArrayOf(1, 2), intArrayOf(0, 1)
+    )
+
+    assertEquals(filteredExpected.formatString(), filteredActual.formatString())
+  }
+
+  @Test
+  fun `given a tree with many nodes on the same level only failing nodes are removed`() {
+    // Root 1 (depth 0) -> siblings 2, 3, 4, 5 (all depth 1)
+    // Sibling 3 fails; its siblings 2, 4, 5 are unaffected
+    val unfiltered: Hierarchy = ArrayBasedHierarchy(
+      intArrayOf(1, 2, 3, 4, 5), intArrayOf(0, 1, 1, 1, 1)
+    )
+    val filteredActual: Hierarchy = unfiltered.filter { nodeId -> nodeId % 3 != 0 }
+    val filteredExpected: Hierarchy = ArrayBasedHierarchy(
+      intArrayOf(1, 2, 4, 5), intArrayOf(0, 1, 1, 1)
+    )
+
+    assertEquals(filteredExpected.formatString(), filteredActual.formatString())
+  }
+
+  @Test
+  fun `given an empty hierarchy filter should return an empty hierarchy`() {
+    val unfiltered: Hierarchy = ArrayBasedHierarchy(intArrayOf(), intArrayOf())
+    val filteredActual: Hierarchy = unfiltered.filter { true }
+    val filteredExpected: Hierarchy = ArrayBasedHierarchy(intArrayOf(), intArrayOf())
+
+    assertEquals(filteredExpected.formatString(), filteredActual.formatString())
+  }
+
+  // Similar coverage as the original test
+  @Test
+  fun `given a failing intermediate node its subtree should be trimmed while passing siblings and their children survive`() {
+    // Root 1 (depth 0)
+    //   ├── child 3 (depth 1, fails), 4 and 3 should be removed
+    //   └── child 2 (depth 1, passes), 2 and 5 should pass
+    val unfiltered: Hierarchy = ArrayBasedHierarchy(
+      intArrayOf(1, 3, 4, 2, 5), intArrayOf(0, 1, 2, 1, 2)
+    )
+    val filteredActual: Hierarchy = unfiltered.filter { nodeId -> nodeId % 3 != 0 }
+    val filteredExpected: Hierarchy = ArrayBasedHierarchy(
+      intArrayOf(1, 2, 5), intArrayOf(0, 1, 2)
     )
 
     assertEquals(filteredExpected.formatString(), filteredActual.formatString())
