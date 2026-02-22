@@ -1,3 +1,4 @@
+import org.junit.jupiter.api.Test
 import kotlin.test.*
 
 // The task:
@@ -76,13 +77,37 @@ interface Hierarchy {
  * A node is present in the filtered hierarchy iff its node ID passes the predicate and all of its ancestors pass it as well.
  */
 fun Hierarchy.filter(nodeIdPredicate: (Int) -> Boolean): Hierarchy {
-  // todo implement
-  return ArrayBasedHierarchy(IntArray(0), IntArray(0))
+
+  var index = 0
+  var trimLevel = -1
+  val outputIds = mutableListOf<Int>()
+  val outputDepthIds = mutableListOf<Int>()
+
+  while (index < size) {
+    val node = nodeId(index)
+    val depth = depth(index)
+    if (!nodeIdPredicate(node)) {
+      // Node does not pass predicate. Do not put in output list
+      // iterate while depth > to current depth, thereby trimming the entire branch
+      trimLevel = depth
+      while (index + 1 < size && depth(index + 1) > trimLevel)
+        index++
+    } else {
+      // predicate is true, append node and depth to output
+      outputIds.add(node)
+      outputDepthIds.add(depth)
+    }
+    index++
+  }
+
+  // Complexity: This is done in single pass, so O(n) where n is the size of the input.
+  // Space Complexity: O(2 * N) -> O(N) to store ids and depth
+  return ArrayBasedHierarchy(outputIds.toIntArray(), outputDepthIds.toIntArray())
 }
 
 class ArrayBasedHierarchy(
   private val myNodeIds: IntArray,
-  private val myDepths: IntArray,
+    private val myDepths: IntArray,
 ) : Hierarchy {
   override val size: Int = myDepths.size
 
@@ -96,11 +121,14 @@ class FilterTest {
   fun testFilter() {
     val unfiltered: Hierarchy = ArrayBasedHierarchy(
       intArrayOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
-      intArrayOf(0, 1, 2, 3, 1, 0, 1, 0, 1, 1, 2))
+                                                    intArrayOf(0, 1, 2, 3, 1, 0, 1, 0, 1, 1, 2)
+    )
     val filteredActual: Hierarchy = unfiltered.filter { nodeId -> nodeId % 3 != 0 }
     val filteredExpected: Hierarchy = ArrayBasedHierarchy(
       intArrayOf(1, 2, 5, 8, 10, 11),
-      intArrayOf(0, 1, 1, 0, 1, 2))
+                                                          intArrayOf(0, 1, 1, 0, 1, 2)
+    )
+
     assertEquals(filteredExpected.formatString(), filteredActual.formatString())
   }
 }
