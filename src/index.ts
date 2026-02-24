@@ -1,20 +1,15 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { Redis as IORedis } from "ioredis";
 import { env } from "./config/env.js";
 import { db } from "./db/db_router.js";
+import { getRedis } from "./lib/redis.js";
+import { productRoutes } from "./products/product.routes.js";
 import { userRoutes } from "./users/user.routes.js";
 
 const app = new Hono();
 
-// Lazy connections — created on first health check
-let redis: IORedis | null = null;
-
-function getRedis() {
-	return (redis ??= new IORedis(env.redisUrl, { lazyConnect: true }));
-}
-
 app.route("/users", userRoutes);
+app.route("/products", productRoutes);
 
 app.get("/health", (c) => {
 	return c.json({ status: "ok" });
