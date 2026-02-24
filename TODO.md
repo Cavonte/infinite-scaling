@@ -26,18 +26,22 @@
 - [x] Failure scenario: kill a replica — does the router fall back gracefully?
 
 ## Phase 5: Redis — Cache-Aside
-- [x] Set up ioredis connection
-- [x] Implement cache-aside for product listings (GET /stores/:id/products)
+- [x] Set up ioredis connection (shared singleton via `src/lib/redis.ts`)
+- [x] Implement cache-aside for `GET /products/:id` and `GET /products`
 - [x] Implement cache invalidation on product create/update/delete
-- [ ] Test: verify cache hit/miss behavior
-- [ ] Add Paging for All Products
+- [x] Test: verified cache hit/miss behavior via benchmarks
+- [ ] Add pagination for `GET /products` — currently returns full table (~21MB), not benchmarkable at scale
 - [ ] Failure scenario: kill Redis — does the app degrade gracefully or crash?
 
 ## Phase 5.5: Benchmark — Baseline vs Read Replicas vs Redis
-- [x] Run k6 load test: baseline, record p50/p95/p99 latency + RPS
-- [x] Enable read replica routing, re-run k6, compare
-- [x] Enable Redis cache, re-run k6, compare
-- [x] Document results: what improved, by how much, and why
+- [x] Set up k6 (`k6/products.bench.js`, constant-arrival-rate executor)
+- [x] Run at 300 req/s — all features flat, primary under no pressure
+- [x] Run at 900 req/s — meaningful load, reveals real differences between configs
+- [x] Tested all four combinations: baseline, Redis, replicas, replicas + Redis
+- [x] Documented results in `benchmark/RESULTS.md`
+- [ ] Re-run with hot-key access pattern (80/20 split: top 200 products get 80% of traffic)
+- [ ] Re-run with mixed read/write load to properly benchmark replica offloading
+- [ ] Increase replica connection pool (max: 10 → 25-50) and retest replica saturation point
 
 ## Phase 6: Sharding
 - [ ] Create shard map config (store_id ranges -> PG connection strings)
@@ -72,14 +76,16 @@
 - [ ] Document: why fail-fast is better than hanging threads
 
 ## Phase 11: Benchmarking with k6
-- [ ] Install k6
-- [ ] Write k6 scenario: 1,000 RPS, 70/30 read/write mix
-- [ ] Run benchmark 1: Baseline (all flags off)
-- [ ] Run benchmark 2: + Read replicas
-- [ ] Run benchmark 3: + Redis cache
-- [ ] Run benchmark 4: + Sharding
-- [ ] Collect p50/p95/p99 latency, throughput, error rate for each run
-- [ ] Compare results and document improvements
+- [x] Install k6 (v1.6.1)
+- [x] Write k6 scenario: constant-arrival-rate, product endpoint
+- [x] Run benchmark 1: Baseline
+- [x] Run benchmark 2: + Read replicas
+- [x] Run benchmark 3: + Redis cache
+- [x] Run benchmark 4: + Replicas and Redis combined
+- [ ] Run benchmark 5: hot-key distribution (realistic traffic pattern)
+- [ ] Run benchmark 6: mixed read/write (proper replica test)
+- [ ] Add URL grouping to suppress high-cardinality metric warnings
+- [ ] Collect results for sharding phase once implemented
 
 ## Phase 12: Polish & Interview Prep
 - [ ] Add API documentation / route summary
