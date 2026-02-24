@@ -26,18 +26,18 @@
 - [x] Failure scenario: kill a replica — does the router fall back gracefully?
 
 ## Phase 5: Redis — Cache-Aside
-- [ ] Set up ioredis connection
-- [ ] Implement cache-aside for product listings (GET /stores/:id/products)
-- [ ] Implement cache invalidation on product create/update/delete
+- [x] Set up ioredis connection
+- [x] Implement cache-aside for product listings (GET /stores/:id/products)
+- [x] Implement cache invalidation on product create/update/delete
 - [ ] Test: verify cache hit/miss behavior
+- [ ] Add Paging for All Products
 - [ ] Failure scenario: kill Redis — does the app degrade gracefully or crash?
 
 ## Phase 5.5: Benchmark — Baseline vs Read Replicas vs Redis
-- [ ] Build `GET /stores/:id/products` endpoint (baseline — direct primary query)
-- [ ] Run k6 load test: baseline, record p50/p95/p99 latency + RPS
-- [ ] Enable read replica routing, re-run k6, compare
-- [ ] Enable Redis cache, re-run k6, compare
-- [ ] Document results: what improved, by how much, and why
+- [x] Run k6 load test: baseline, record p50/p95/p99 latency + RPS
+- [x] Enable read replica routing, re-run k6, compare
+- [x] Enable Redis cache, re-run k6, compare
+- [x] Document results: what improved, by how much, and why
 
 ## Phase 6: Sharding
 - [ ] Create shard map config (store_id ranges -> PG connection strings)
@@ -49,22 +49,22 @@
 - [ ] Document: how cross-shard queries are handled (or explicitly not supported)
 - [ ] Failure scenario: take down one shard — what does the API return?
 
-## Phase 7: Redis — Session & Cart Storage
+## Phase 7.1: Redis — Session & Cart Storage
 - [ ] Implement cart storage in Redis (hash per cart, TTL expiry)
 - [ ] API endpoints: add to cart, view cart, remove from cart
 - [ ] Test: cart persists across requests, expires after TTL
 
-## Phase 8: Redis — Rate Limiting
+## Phase 7.2: Redis — Rate Limiting
 - [ ] Implement sliding window rate limiter middleware
 - [ ] Apply to API endpoints (e.g., max 100 requests/minute)
 - [ ] Test: verify requests are blocked after limit exceeded
 
-## Phase 9: Redis — Distributed Locks
+## Phase 7.3: Redis — Distributed Locks
 - [ ] Implement Redlock pattern for order submission
 - [ ] Prevent double-order: acquire lock on `store:order:customer_id`
 - [ ] Test: concurrent order submissions, only one succeeds
 
-## Phase 10: Circuit Breaker
+## Phase 8: Circuit Breaker
 - [ ] Implement circuit breaker for database connections (open/half-open/closed states)
 - [ ] Track failure rate per shard — open circuit on threshold breach
 - [ ] Probe with single request in half-open state before closing
