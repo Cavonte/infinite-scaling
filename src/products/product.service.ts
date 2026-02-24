@@ -15,6 +15,7 @@ const KEYS = {
 export const productService = {
 	async listProducts() {
 		if (features.redisCache) {
+			console.log("Reading From Redis")
 			const cached = await getRedis().get(KEYS.list);
 			if (cached) return JSON.parse(cached);
 		}
@@ -35,6 +36,7 @@ export const productService = {
 
 	async getByid(id: number, forcePrimary: boolean = false) {
 		if (features.redisCache) {
+			console.log("Reading From Redis")
 			const cached = await getRedis().get(KEYS.product(id));
 			if (cached) return JSON.parse(cached);
 		}
