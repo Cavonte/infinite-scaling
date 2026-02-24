@@ -114,11 +114,4 @@ To show replica benefit: run concurrent `POST /products` writes against the prim
 | Replicas | 900/s | 97.52ms | +88ms | WAL replay + pool saturation cascade |
 | Replicas + Redis | 900/s | 24.62ms | +15ms | Cache reduces replica load enough to prevent collapse |
 
----
 
-## What to Test Next
-
-- **Hot-key access pattern** — 80% of traffic to top 200 products, 20% long tail. Should show Redis p(95) dropping to sub-millisecond. Cache hit rate is the variable, not load.
-- **Mixed read/write load** — concurrent writes against `POST /products` + reads. This is the scenario where replicas are designed to win.
-- **Increase replica connection pool** — raise `max` from 10 to 25-50 on replicas and retest. May delay the saturation cascade at 900/s.
-- **Pagination on `GET /products`** — list endpoint returns ~21MB per response, not benchmarkable at scale without `LIMIT`/`OFFSET` or cursor-based pagination.
