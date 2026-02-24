@@ -34,14 +34,16 @@
 - [ ] Failure scenario: kill Redis — does the app degrade gracefully or crash?
 
 ## Phase 5.5: Benchmark — Baseline vs Read Replicas vs Redis
+- [x] Install k6 and Write k6 scenarios
 - [x] Set up k6 (`k6/products.bench.js`, constant-arrival-rate executor)
-- [x] Run at 300 req/s — all features flat, primary under no pressure
-- [x] Run at 900 req/s — meaningful load, reveals real differences between configs
-- [x] Tested all four combinations: baseline, Redis, replicas, replicas + Redis
+- [x] Run benchmark 1: Baseline
+- [x] Run benchmark 2: + Read replicas
+- [x] Run benchmark 3: + Redis cache
+- [x] Run benchmark 4: + Replicas and Redis combined
 - [x] Documented results in `benchmark/RESULTS.md`
 - [ ] Re-run with hot-key access pattern (80/20 split: top 200 products get 80% of traffic)
-- [ ] Re-run with mixed read/write load to properly benchmark replica offloading
 - [ ] Increase replica connection pool (max: 10 → 25-50) and retest replica saturation point
+- [ ] Run benchmark 5: hot-key distribution (realistic traffic pattern)
 
 ## Phase 6: Sharding
 - [ ] Create shard map config (store_id ranges -> PG connection strings)
@@ -52,6 +54,9 @@
 - [ ] Test: create stores on different shards, query correctly
 - [ ] Document: how cross-shard queries are handled (or explicitly not supported)
 - [ ] Failure scenario: take down one shard — what does the API return?
+- [ ] Run benchmark 6: mixed read/write (proper replica test)
+- [ ] Re-run with mixed read/write load to properly benchmark replica offloading
+- [ ] Collect results for sharding phase once implemented
 
 ## Phase 7.1: Redis — Session & Cart Storage
 - [ ] Implement cart storage in Redis (hash per cart, TTL expiry)
@@ -75,19 +80,7 @@
 - [ ] Test: force shard failure, verify circuit opens and requests fail fast
 - [ ] Document: why fail-fast is better than hanging threads
 
-## Phase 11: Benchmarking with k6
-- [x] Install k6 (v1.6.1)
-- [x] Write k6 scenario: constant-arrival-rate, product endpoint
-- [x] Run benchmark 1: Baseline
-- [x] Run benchmark 2: + Read replicas
-- [x] Run benchmark 3: + Redis cache
-- [x] Run benchmark 4: + Replicas and Redis combined
-- [ ] Run benchmark 5: hot-key distribution (realistic traffic pattern)
-- [ ] Run benchmark 6: mixed read/write (proper replica test)
-- [ ] Add URL grouping to suppress high-cardinality metric warnings
-- [ ] Collect results for sharding phase once implemented
-
-## Phase 12: Polish & Interview Prep
+## Phase 9: Polish & Interview Prep
 - [ ] Add API documentation / route summary
 - [ ] Write README with architecture diagram and trade-offs per module
 - [ ] Prepare talking points for each scaling pattern (see system_design_drills.md)
