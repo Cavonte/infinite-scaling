@@ -20,11 +20,11 @@ export const options = {
     // Mixed single-product reads across random IDs
     get_product: {
       executor: "constant-arrival-rate",
-      rate: 300,
+      rate: 900,
       timeUnit: "1s",
       duration: "30s",
-      preAllocatedVUs: 30,
-      maxVUs: 120,
+      preAllocatedVUs: 50,
+      maxVUs: 200,
       exec: "getProduct",
     },
   },
