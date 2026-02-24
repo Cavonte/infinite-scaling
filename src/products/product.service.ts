@@ -22,23 +22,35 @@ export const productService = {
 		const products = await productRepository.findAllListed();
 
 		if (features.redisCache) {
-			await getRedis().set(KEYS.list, JSON.stringify(products), "EX", CACHE_TTL_SECONDS);
+			await getRedis().set(
+				KEYS.list,
+				JSON.stringify(products),
+				"EX",
+				CACHE_TTL_SECONDS,
+			);
 		}
 
 		return products;
 	},
 
-	async getProduct(id: number) {
+	async getByid(id: number, forcePrimary: boolean = false) {
 		if (features.redisCache) {
 			const cached = await getRedis().get(KEYS.product(id));
 			if (cached) return JSON.parse(cached);
 		}
 
-		const product = await productRepository.findById(id);
+		const product = forcePrimary
+			? await productRepository.findByIdPrimary(id)
+			: await productRepository.findById(id);
 		if (!product) throw new Error(`Product ${id} not found`);
 
 		if (features.redisCache) {
-			await getRedis().set(KEYS.product(id), JSON.stringify(product), "EX", CACHE_TTL_SECONDS);
+			await getRedis().set(
+				KEYS.product(id),
+				JSON.stringify(product),
+				"EX",
+				CACHE_TTL_SECONDS,
+			);
 		}
 
 		return product;

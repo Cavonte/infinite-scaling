@@ -42,6 +42,28 @@ export const productRepository = {
     `;
 	},
 
+    async findByIdPrimary(id: number): Promise<ProductWithSkus | null> {
+      const rows = await db.write<ProductWithSkus[]>`
+      SELECT
+      p.id,
+      p.store_id AS "storeId",
+      p.name,
+      p.description,
+      p.price,
+      p.listed,
+      COALESCE(
+        json_agg(json_build_object('id', s.id, 'description', s.description, 'supply', s.supply))
+        FILTER (WHERE s.id IS NOT NULL),
+               '[]'
+      ) AS skus
+      FROM products p
+      LEFT JOIN skus s ON s.product_id = p.id
+      WHERE p.id = ${id}
+      GROUP BY p.id
+      `;
+      return rows[0] ?? null;
+    },
+
 	async findById(id: number): Promise<ProductWithSkus | null> {
 		const rows = await db.read<ProductWithSkus[]>`
       SELECT
