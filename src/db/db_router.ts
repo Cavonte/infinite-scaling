@@ -21,7 +21,7 @@ function read<T extends postgres.Row[] = postgres.Row[]>(
 	...values: any[]
 ): Promise<T> {
 	if (!features.readReplicas) {
-		console.log("Reading from Primary");
+		console.log("No Replica Usage");
 		return main<T>(strings, ...values);
 	}
 	const replica = nextReplica();
