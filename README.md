@@ -2,6 +2,8 @@
 
 A progressive Node.js/TypeScript API exploring real-world scaling patterns. This is is a demo and referrence for read replicas, Redis caching, sharding, rate limiting, and distributed locks.
 
+See outcomes and analysis in benchMark folder
+
 ## Stack
 
 - **Runtime**: Node.js, TypeScript (ESM), tsx, pnpm
