@@ -1,117 +1,103 @@
 # Benchmark Results
 
----
-
-## Round 1 — 300 req/s (exploratory)
-
-- **Tool:** k6 v1.6.1
-- **Endpoint:** `GET /products/:id`
-- **Executor:** constant-arrival-rate — 300 req/s for 30s
-- **VUs:** preAllocatedVUs=30, maxVUs=120
-- **Access pattern:** uniform random IDs across 100,000 seeded products
-- **Threshold:** p(95) < 300ms
-
-| Metric | Baseline | Redis Cache | Read Replicas |
-|---|---|---|---|
-| Requests | 9001 at 300/s | 9001 at 300/s | 9001 at 300/s |
-| avg | 5.01ms | 5.39ms | 5.48ms |
-| min | 4.58ms | 90.61µs | 5.03ms |
-| med | 4.95ms | 5.49ms | 5.38ms |
-| p(95) | 5.41ms | 6.1ms | 5.98ms |
-| max | 25.46ms | 33.23ms | 26.74ms |
-| Dropped | 0 | 0 | 0 |
-
-### Key findings at 300 req/s
-
-At this load the primary was under no meaningful pressure (~1.5 of 10 pooled connections in use). Neither feature improved results because there was no bottleneck to solve.
-
-- **Redis** hurt p(95) slightly: only ~9% cache hit rate (9001 requests / 100k IDs). 91% of requests paid Redis GET + DB + Redis SET instead of just DB.
-- **Replicas** added ~0.5ms overhead from Docker inter-container network routing with no benefit to offset it.
+**Endpoint:** `GET /products/:id`
+**Tool:** k6 v1.6.1, constant-arrival-rate executor
+**Dataset:** 100,000 seeded products
 
 ---
 
-## Round 2 — 900 req/s (meaningful load)
+## Results Summary
 
-- **Executor:** constant-arrival-rate — 900 req/s for 30s
-- **VUs:** preAllocatedVUs=50, maxVUs=200
-- **Access pattern:** same — uniform random IDs across 100,000 seeded products
-- **Threshold:** p(95) < 300ms
-
-| Metric | Baseline | Redis Cache | Read Replicas | Replicas + Redis |
+| Run | Load | Access pattern | p(95) | vs Baseline |
 |---|---|---|---|---|
-| Requests | 27001 | 27001 | 26962 | 26996 |
-| avg | 7.11ms | 6.17ms | 33.82ms | 10.87ms |
-| min | 4.87ms | 68.63µs | 9.44ms | 76.88µs |
-| med | 6.72ms | 6.09ms | 21.67ms | 8.37ms |
-| p(90) | 8.27ms | 8.13ms | 66.19ms | 19.36ms |
+| Baseline | 300/s | uniform random | 5.41ms | — |
+| Redis cache | 300/s | uniform random | 6.1ms | +13% |
+| Read replicas | 300/s | uniform random | 5.98ms | +11% |
+| Baseline | 900/s | uniform random | 9.45ms | — |
+| Redis cache | 900/s | uniform random | 9.26ms | -2% |
+| Read replicas | 900/s | uniform random | 97.52ms | +931% |
+| Replicas + Redis | 900/s | uniform random | 24.62ms | +160% |
+| Redis cache | 1000/s | 80/20 hot-key | 5.55ms | -41% vs 900/s baseline |
+
+---
+
+## Round 1 — 300 req/s
+
+Neither feature helped. The primary was under no pressure (~1.5/10 pooled connections in use) — no bottleneck to relieve.
+
+- **Redis:** ~9% hit rate (9k requests / 100k IDs). 91% of requests paid Redis GET + DB + Redis SET instead of just DB. Net negative.
+- **Replicas:** +0.5ms Docker inter-container overhead with nothing to offset it.
+
+---
+
+## Round 2 — 900 req/s, uniform random
+
+| Metric | Baseline | Redis | Replicas | Replicas + Redis |
+|---|---|---|---|---|
 | p(95) | 9.45ms | 9.26ms | 97.52ms | 24.62ms |
-| max | 35ms | 180ms | 396ms | 213ms |
-| VUs needed | 5–14 | 4–8 | 14–78 | 3–39 |
+| med | 6.72ms | 6.09ms | 21.67ms | 8.37ms |
 | Dropped | 0 | 0 | 39 | 4 |
 
----
+### Redis — marginal gain
 
-## Analysis
+Hit rate climbed to ~27% (27k requests / 100k IDs). Cache hits return in ~70µs vs ~7ms from DB. Two effects compound:
+1. Cache hits bypass DB entirely
+2. **Load shedding**: 27% fewer DB queries reduce contention, making cache misses faster too
 
-### Redis Cache — starts helping at higher load
+p(95) improved only -2% because uniform random access is the worst case for a cache — the other 73% still hit the DB.
 
-At 300/s Redis hurt (9% hit rate, overhead outweighs savings). At 900/s Redis helps (avg -13%, p(95) -2%):
+### Read replicas — pool saturation cascade
 
-```
-300 req/s → 9,001 requests  / 100,000 IDs ≈  ~9% hit rate  → Redis hurts
-900 req/s → 27,001 requests / 100,000 IDs ≈ ~27% hit rate  → Redis helps
-```
+p(95) degraded 10x. Each replica pool was `max: 10`. At 450 req/s per replica:
 
-Two effects compound at higher load:
-1. Higher hit rate means more requests return in ~70µs (pure Redis, no DB)
-2. **Load shedding**: cache hits reduce concurrent pressure on Postgres, making cache misses faster too — the backend queues less, so even the 73% of requests that miss the cache benefit indirectly
+1. WAL replay (streaming replication) competes with query execution for CPU/IO — replicas run slower than primary
+2. Slower queries hold connections longer → pool exhausts
+3. New requests queue for a free connection → latency climbs → more connections held → deeper queue
 
-The higher max (180ms vs 35ms) reflects cold cache misses under pressure: Redis GET miss + Postgres query under contention + Redis SET on the way out creates occasional tail spikes.
+Primary never hit this: consistent ~5ms kept pool usage at ~4.5/10. VUs climbing to 78 (vs 14 baseline) confirmed the server was falling behind.
 
-**Redis cache benefit scales with load, not against it.**
-
-### Read Replicas — catastrophic degradation at 900 req/s
-
-At 300/s replicas added 0.5ms. At 900/s they degraded p(95) by 10x (9.45ms → 97.52ms). This is a feedback loop:
-
-1. Replica containers do continuous WAL replay (streaming replication) which competes with query processing for CPU/IO
-2. Replica queries run slightly slower than primary as a result
-3. Each replica pool is `max: 10` connections. At 450 req/s per replica, any latency increase tips the pool toward saturation
-4. Saturated pool → requests queue → latency climbs → more connections needed → deeper queue
-
-The primary never hit this at 900/s because it held consistent ~5ms responses, keeping pool usage at ~4.5/10. The replicas started slower and couldn't recover.
-
-VUs climbing to 78 (vs 14 for baseline) confirms the server was falling behind — k6 needed more concurrent workers to keep firing requests because responses were so slow.
-
-### Replicas + Redis — cache rescues replicas from saturation
-
-Adding Redis cache to the replica setup pulled p(95) from 97ms back to 24ms. The ~27% cache hit rate reduced load on each replica by ~27%, enough to prevent the worst pool saturation cascades. But cache misses still route to slow replicas, so the combined run is still worse than Redis alone against the primary (24ms vs 9.26ms).
-
-Redis did not fix the replica problem — it masked enough of it to avoid collapse.
-
-### The right scenario for read replicas
-
-This benchmark had no concurrent writes. Read replicas are designed for:
-
-```
-Heavy writes saturating primary → read latency spikes on primary
-With replicas → reads bypass the write queue entirely
-```
-
-To show replica benefit: run concurrent `POST /products` writes against the primary while benchmarking `GET /products/:id`. The baseline would degrade under write pressure; the replica run would hold steady.
+**Replicas + Redis:** cache hit rate reduced replica load by ~27%, enough to break the saturation loop. p(95) recovered from 97ms to 24ms — still worse than Redis alone because cache misses still route to slower replicas.
 
 ---
 
-## Summary Table
+## Round 3 — 1000 req/s, 80/20 hot-key + optimisations
 
-| Run | Load | p(95) | vs Baseline | Root cause |
-|---|---|---|---|---|
-| Baseline | 300/s | 5.41ms | — | — |
-| Redis | 300/s | 6.1ms | +0.69ms | ~9% hit rate — overhead > savings |
-| Replicas | 300/s | 5.98ms | +0.57ms | No bottleneck to relieve |
-| Baseline | 900/s | 9.45ms | — | — |
-| Redis | 900/s | 9.26ms | -0.19ms | ~27% hit rate + load shedding |
-| Replicas | 900/s | 97.52ms | +88ms | WAL replay + pool saturation cascade |
-| Replicas + Redis | 900/s | 24.62ms | +15ms | Cache reduces replica load enough to prevent collapse |
+Three changes applied before this run:
 
+1. **80/20 access pattern** — 80% of traffic targets top 200 product IDs, 20% uniform random
+2. **Async cache writes** — `SET` on cache miss is fire-and-forget (`.catch` for errors); response returns as soon as DB result is ready, no longer blocked by Redis round-trip
+3. **Replica pool** — increased `max: 10 → 50` per replica
 
+| Metric | get_product (900→1000/s) | list_products (100/s, paged) |
+|---|---|---|
+| med | 120µs | 149µs |
+| p(90) | 5.27ms | 228µs |
+| p(95) | 5.55ms | 264µs |
+| Dropped | 24 | 0 |
+| Error rate | 0% | 0% |
+
+### Cache hit rate under 80/20
+
+80% of `get_product` traffic targets 200 IDs. At 60s TTL those keys warm in the first second and stay warm for the entire 30s run. Effective hit rate ~80% vs ~27% under uniform random.
+
+The bimodal distribution is visible in the numbers: **med = 120µs** (Redis hit) vs **p(95) = 5.55ms** (DB miss). The gap between them is the cost of a Postgres round-trip.
+
+### list_products — near-total cache coverage
+
+100 req/s across 50 distinct page keys (`offset` 0–1470, `limit` 30). At 60s TTL all 50 keys warm within the first second. **p(95) = 264µs** — effectively every request is a cache hit. This is the ceiling for what Redis cache-aside can deliver on a listing endpoint.
+
+### Async cache writes
+
+Removing `await` from the cache `SET` path means the response no longer blocks on the Redis round-trip after a DB miss. Effect is most visible at the median and average — tail latency (p(95)) is dominated by the DB query time regardless.
+
+---
+
+## Key takeaways
+
+| Finding | Detail |
+|---|---|
+| Cache benefit scales with hit rate | 9% hit rate → Redis hurts. 27% → marginal gain. 80% → -41% p(95) |
+| Replicas are a write-offload tool | Benefit only visible under concurrent write pressure on the primary |
+| Pool saturation is a cascade | One slow query holds a connection; exhausted pool queues everything |
+| Async cache writes reduce avg/med | p(95) still floor'd by DB query time on misses |
+| Uniform random is a worst-case cache test | Real traffic has hot keys — always benchmark with a realistic distribution |

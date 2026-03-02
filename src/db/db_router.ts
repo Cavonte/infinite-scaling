@@ -4,8 +4,8 @@ import { features } from "../config/features.js";
 
 const main = postgres(env.databaseUrl, { max: 10 });
 const replicas = [
-	postgres(env.databaseUrlReplica1, { max: 10 }),
-	postgres(env.databaseUrlReplica2, { max: 10 }),
+	postgres(env.databaseUrlReplica1, { max: 50 }),
+	postgres(env.databaseUrlReplica2, { max: 50 }),
 ];
 
 let counter = 0;

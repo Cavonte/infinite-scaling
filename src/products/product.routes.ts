@@ -6,10 +6,18 @@ export const productRoutes = new Hono<{
 	Variables: { forcePrimary: boolean };
 }>();
 
-productRoutes.use(ryow)
+productRoutes.use(ryow);
+
+const DEFAULT_LIMIT = 30;
+const MAX_LIMIT = 100;
 
 productRoutes.get("/", async (c) => {
-	return c.json(await productService.listProducts());
+	const limit = Math.max(
+		1,
+		Math.min(MAX_LIMIT, Number(c.req.query("limit")) || DEFAULT_LIMIT),
+	);
+	const offset = Math.max(0, Number(c.req.query("offset")) || 0);
+	return c.json(await productService.listProducts(limit, offset));
 });
 
 productRoutes.get("/:id", async (c) => {
@@ -25,7 +33,7 @@ productRoutes.get("/:id", async (c) => {
 productRoutes.post("/", async (c) => {
 	try {
 		const body = await c.req.json();
-		const product = await productService.createProduct(body)
+		const product = await productService.createProduct(body);
 		return c.json(product, 201, { "x-write-token": String(Date.now()) });
 	} catch (err) {
 		return c.json({ error: (err as Error).message }, 400);
@@ -36,7 +44,7 @@ productRoutes.put("/:id", async (c) => {
 	try {
 		const id = Number(c.req.param("id"));
 		const body = await c.req.json();
-		const product = await productService.updateProduct(id, body)
+		const product = await productService.updateProduct(id, body);
 		return c.json(product, 200, { "x-write-token": String(Date.now()) });
 	} catch (err) {
 		return c.json({ error: (err as Error).message }, 404);

@@ -30,7 +30,7 @@
 - [x] Implement cache-aside for `GET /products/:id` and `GET /products`
 - [x] Implement cache invalidation on product create/update/delete
 - [x] Test: verified cache hit/miss behavior via benchmarks
-- [ ] Add pagination for `GET /products` — currently returns full table (~21MB), not benchmarkable at scale
+- [x] Add pagination for `GET /products` and `GET /users` — previously returned full table, not benchmarkable at scale
 - [ ] Failure scenario: kill Redis — does the app degrade gracefully or crash?
 
 ## Phase 5.5: Benchmark — Baseline vs Read Replicas vs Redis
@@ -41,9 +41,11 @@
 - [x] Run benchmark 3: + Redis cache
 - [x] Run benchmark 4: + Replicas and Redis combined
 - [x] Documented results in `benchmark/RESULTS.md`
-- [ ] Re-run with hot-key access pattern (80/20 split: top 200 products get 80% of traffic)
-- [ ] Increase replica connection pool (max: 10 → 25-50) and retest replica saturation point
-- [ ] Run benchmark 5: hot-key distribution (realistic traffic pattern)
+- [x] Re-run with hot-key access pattern (80/20 split: top 200 products get 80% of traffic)
+- [x] Increase replica connection pool (max: 10 → 50) and retest replica saturation point
+- [x] Add list_products scenario to benchmark (paged, 100 req/s)
+- [ ] Run benchmark 5: hot-key + Redis cache — document final results in RESULTS.md
+- [ ] Find replica connection ceiling empirically: watch `pg_stat_activity` under load, tune `max` until idle connections appear
 
 ## Phase 6: Sharding
 - [ ] Create shard map config (store_id ranges -> PG connection strings)
