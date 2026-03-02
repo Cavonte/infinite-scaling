@@ -6,8 +6,8 @@ import {
 } from "./user.repository.js";
 
 export const userService = {
-	listUsers() {
-		return userRepository.findAll();
+	listUsers(limit: number, offset: number) {
+		return userRepository.findAll(limit, offset);
 	},
 
 	async getUser(id: number, forcePrimary = false) {

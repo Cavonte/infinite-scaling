@@ -6,29 +6,28 @@ import {
 	type UpdateProductInput,
 } from "./product.repository.js";
 
-const CACHE_TTL_SECONDS = 60;
+const CACHE_TTL_SECONDS = 600;
 const KEYS = {
 	list: "products:listed",
 	product: (id: number) => `products:${id}`,
 } as const;
 
 export const productService = {
-	async listProducts() {
+	async listProducts(limit: number, offset: number) {
 		if (features.redisCache) {
-			console.log("Reading From Redis")
-			const cached = await getRedis().get(KEYS.list);
+			console.log("Reading From Redis");
+			const key = `${KEYS.list}:offset:${offset}:limit:${limit}`;
+			const cached = await getRedis().get(key);
 			if (cached) return JSON.parse(cached);
 		}
 
-		const products = await productRepository.findAllListed();
+		const products = await productRepository.findAllListed(limit, offset);
 
 		if (features.redisCache) {
-			await getRedis().set(
-				KEYS.list,
-				JSON.stringify(products),
-				"EX",
-				CACHE_TTL_SECONDS,
-			);
+			const key = `${KEYS.list}:offset:${offset}:limit:${limit}`;
+			getRedis()
+				.set(key, JSON.stringify(products), "EX", CACHE_TTL_SECONDS)
+				.catch((err) => console.error("Cache write failed:", err));
 		}
 
 		return products;
@@ -36,7 +35,7 @@ export const productService = {
 
 	async getByid(id: number, forcePrimary: boolean = false) {
 		if (features.redisCache) {
-			console.log("Reading From Redis")
+			console.log("Reading From Redis");
 			const cached = await getRedis().get(KEYS.product(id));
 			if (cached) return JSON.parse(cached);
 		}
@@ -47,12 +46,9 @@ export const productService = {
 		if (!product) throw new Error(`Product ${id} not found`);
 
 		if (features.redisCache) {
-			await getRedis().set(
-				KEYS.product(id),
-				JSON.stringify(product),
-				"EX",
-				CACHE_TTL_SECONDS,
-			);
+			getRedis()
+				.set(KEYS.product(id), JSON.stringify(product), "EX", CACHE_TTL_SECONDS)
+				.catch((err) => console.error("Cache write failed:", err));
 		}
 
 		return product;

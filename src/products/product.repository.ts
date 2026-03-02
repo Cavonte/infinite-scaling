@@ -33,17 +33,19 @@ export type UpdateProductInput = {
 };
 
 export const productRepository = {
-	async findAllListed(): Promise<Product[]> {
+	async findAllListed(limit: number, offset: number): Promise<Product[]> {
 		return db.read<Product[]>`
       SELECT id, store_id AS "storeId", name, description, price, listed
       FROM products
       WHERE listed = true
       ORDER BY id
+      LIMIT ${limit}
+      OFFSET ${offset}
     `;
 	},
 
-    async findByIdPrimary(id: number): Promise<ProductWithSkus | null> {
-      const rows = await db.write<ProductWithSkus[]>`
+	async findByIdPrimary(id: number): Promise<ProductWithSkus | null> {
+		const rows = await db.write<ProductWithSkus[]>`
       SELECT
       p.id,
       p.store_id AS "storeId",
@@ -61,8 +63,8 @@ export const productRepository = {
       WHERE p.id = ${id}
       GROUP BY p.id
       `;
-      return rows[0] ?? null;
-    },
+		return rows[0] ?? null;
+	},
 
 	async findById(id: number): Promise<ProductWithSkus | null> {
 		const rows = await db.read<ProductWithSkus[]>`

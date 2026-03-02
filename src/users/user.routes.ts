@@ -8,8 +8,16 @@ export const userRoutes = new Hono<{
 
 userRoutes.use(ryow);
 
+const DEFAULT_LIMIT = 30;
+const MAX_LIMIT = 100;
+
 userRoutes.get("/", async (c) => {
-	return c.json(await userService.listUsers());
+	const limit = Math.max(
+		1,
+		Math.min(MAX_LIMIT, Number(c.req.query("limit")) || DEFAULT_LIMIT),
+	);
+	const offset = Math.max(0, Number(c.req.query("offset")) || 0);
+	return c.json(await userService.listUsers(limit, offset));
 });
 
 userRoutes.get("/:id", async (c) => {

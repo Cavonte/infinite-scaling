@@ -5,8 +5,10 @@ export type CreateUserInput = { name: string; location?: string };
 export type UpdateUserInput = { name?: string; location?: string };
 
 export const userRepository = {
-	async findAll(): Promise<User[]> {
-		return db.read<User[]>`SELECT id, name, location FROM users ORDER BY id`;
+	async findAll(limit: number, offset: number): Promise<User[]> {
+		return db.read<
+			User[]
+		>`SELECT id, name, location FROM users ORDER BY id LIMIT ${limit} OFFSET ${offset}`;
 	},
 
 	async findById(id: number): Promise<User | null> {
