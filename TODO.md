@@ -31,6 +31,9 @@
 - [x] Implement cache invalidation on product create/update/delete
 - [x] Test: verified cache hit/miss behavior via benchmarks
 - [x] Add pagination for `GET /products` and `GET /users` — previously returned full table, not benchmarkable at scale
+- [ ] Fix list cache invalidation — writes call `del("products:listed")` but paginated keys are `products:listed:offset:N:limit:N`, so invalidation is a no-op. Use a generation counter (`INCR products:listed:gen`) so old page keys expire via TTL naturally
+- [ ] Fault-tolerance on Redis `get` — cache `set` is wrapped in `.catch` but `get` calls are not; a Redis failure breaks the request instead of falling back to DB
+- [ ] Replace OFFSET pagination with cursor-based (`WHERE id > $lastId`) — OFFSET forces a full index scan up to the offset point, degrades linearly at depth
 - [ ] Failure scenario: kill Redis — does the app degrade gracefully or crash?
 
 ## Phase 5.5: Benchmark — Baseline vs Read Replicas vs Redis
