@@ -17,7 +17,9 @@
 | Redis cache | 900/s | uniform random | 9.26ms | -2% |
 | Read replicas | 900/s | uniform random | 97.52ms | +931% |
 | Replicas + Redis | 900/s | uniform random | 24.62ms | +160% |
-| Redis cache | 1000/s | 80/20 hot-key | 5.55ms | -41% vs 900/s baseline |
+| Replicas + Redis | 1000/s | 80/20 hot-key | 5.55ms | -41% vs 900/s baseline |
+| Replicas + Redis | 2000/s | 80/20 hot-key | 6.19ms | -35% vs 900/s baseline |
+| Replicas + Redis | 5000/s + 1000/s list | 80/20 hot-key | 7.29ms / 929µs | 71/600 VUs used |
 
 ---
 
@@ -62,7 +64,7 @@ Primary never hit this: consistent ~5ms kept pool usage at ~4.5/10. VUs climbing
 
 ## Round 3 — 1000 req/s, 80/20 hot-key + optimisations
 
-Three changes applied before this run:
+**Features: Read replicas + Redis cache both enabled.** Three changes applied before this run:
 
 1. **80/20 access pattern** — 80% of traffic targets top 200 product IDs, 20% uniform random
 2. **Async cache writes** — `SET` on cache miss is fire-and-forget (`.catch` for errors); response returns as soon as DB result is ready, no longer blocked by Redis round-trip
@@ -92,6 +94,78 @@ Removing `await` from the cache `SET` path means the response no longer blocks o
 
 ---
 
+## Round 4 — 2000 req/s get_product, 500 req/s list_products
+
+**Features: Read replicas + Redis cache both enabled.** Same config as Round 3 (80/20 hot-key, async writes). Load doubled on both scenarios.
+
+| Metric | get_product 1000/s | get_product 2000/s | list_products 100/s | list_products 500/s |
+|---|---|---|---|---|
+| med | 120µs | 166µs | 149µs | 176µs |
+| p(90) | 5.27ms | 5.45ms | 228µs | 280µs |
+| p(95) | 5.55ms | 6.19ms | 264µs | 329µs |
+| Dropped | 24 | 194 | 0 | — |
+| Error rate | 0% | 0% | 0% | 0% |
+
+### Observations
+
+**Cache is absorbing the load.** Doubling get_product from 1000/s to 2000/s moved p(95) only +11% (5.55ms → 6.19ms). The hot 200 keys are still served from Redis for ~80% of requests. Median climbed 120µs → 166µs — the hot keys are seeing marginally more contention under 2x volume but the cache layer is holding.
+
+**list_products scales nearly linearly.** 5x load increase (100/s → 500/s) with only +25% on p(95) (264µs → 329µs). 50 page keys at 600s TTL means cache hit rate stays at ~100% regardless of req/s — the bottleneck would be Redis throughput, not the DB.
+
+**194 dropped iterations** — VUs hit the 202 ceiling (maxVUs=200). The server wasn't failing; k6 ran out of pre-allocated virtual users to fire requests. Not a server-side failure — a benchmark config ceiling.
+
+**Throughput: 2493 req/s sustained**, 112 MB received. At this point the local setup is near its ceiling — Node.js single-threaded event loop + local Docker networking are the constraints, not the DB or Redis.
+
+---
+
+## Round 5 — 5000 req/s get_product, 1000 req/s list_products (ceiling test)
+
+**Features: Read replicas + Redis cache both enabled.** maxVUs raised to 400/200. Load 2.5x over Round 4.
+
+| Metric | get_product 2000/s | get_product 5000/s | list_products 500/s | list_products 1000/s |
+|---|---|---|---|---|
+| med | 166µs | 245µs | 176µs | 242µs |
+| p(90) | 5.45ms | 5.46ms | 280µs | 492µs |
+| p(95) | 6.19ms | 7.29ms | 329µs | 929µs |
+| max | 411ms | 49ms | 211ms | 8.5ms |
+| Dropped | 194 | 11 | — | — |
+| VUs used | 202 (hit ceiling) | 71 / 600 | — | — |
+
+### The VU number tells the real story
+
+At 6000 total req/s the server only needed **71 concurrent VUs** out of 600 available. Little's Law explains it:
+
+```
+VUs needed = throughput × avg_response_time
+           = 6000 req/s × 0.00104s = ~6.2 concurrent connections on average
+```
+
+71 VUs at peak accounts for variance and burst — but the system had 8x headroom. The Round 4 VU saturation (202 VUs at 2000/s) was a k6 config problem (`maxVUs: 200` too low), not server saturation.
+
+**list_products stays sub-millisecond at 1000 req/s** (p(95) = 929µs). 50 cached page keys, 600s TTL — hit rate stays ~100% regardless of req/s. The only constraint is Redis network round-trip.
+
+**get_product p(90) barely moved** (5.45ms → 5.46ms) despite 2.5x load. The 80% Redis-served hot keys are insensitive to throughput. p(95) crept up because the cold 20% (DB path) sees marginally more queue time at 5000/s.
+
+**Replicas + Redis: Round 2 vs Round 5.** Same feature combination, different result:
+
+| | Round 2 | Round 5 |
+|---|---|---|
+| Load | 900/s | 5000/s |
+| p(95) | 24.62ms | 7.29ms |
+| Pool | max: 10 | max: 50 |
+| Access | uniform random | 80/20 hot-key |
+| Cache writes | synchronous | async (fire-and-forget) |
+
+Three compounding changes turned a degraded result into the best one in the suite. The pool fix prevented the saturation cascade; the 80/20 pattern reduced replica DB load by ~80%; async writes removed the SET overhead from the response path.
+
+**11 dropped iterations** out of 179,992 (0.006%) — noise. The server is not approaching its limit.
+
+### Where the actual ceiling is
+
+The local setup constraints at this point are: Node.js single-threaded event loop, local container networking latency, and the laptop's CPU. The DB and Redis are not the bottleneck — the cache is absorbing ~80% of get_product load and ~100% of list load. To find the real server ceiling, the next variable to change is horizontal scaling (multiple Node.js processes) or moving off local Docker.
+
+---
+
 ## Key takeaways
 
 | Finding | Detail |
@@ -101,3 +175,7 @@ Removing `await` from the cache `SET` path means the response no longer blocks o
 | Pool saturation is a cascade | One slow query holds a connection; exhausted pool queues everything |
 | Async cache writes reduce avg/med | p(95) still floor'd by DB query time on misses |
 | Uniform random is a worst-case cache test | Real traffic has hot keys — always benchmark with a realistic distribution |
+| Cache scales better than the DB under hot-key load | 2x req/s → +11% p(95). DB-only would scale linearly or worse. |
+| Dropped iterations ≠ server failure | VU ceiling hit first — distinguish k6 config limits from actual server degradation |
+| VU count reveals headroom | 71 VUs at 6000 req/s = 8x headroom. Little's Law: VUs ≈ throughput × avg_latency |
+| list cache is throughput-insensitive | 50 keys, 600s TTL — hit rate stays ~100% from 100/s to 1000/s. Ceiling is Redis RTT. |
