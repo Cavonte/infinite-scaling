@@ -80,13 +80,13 @@ Primary never hit this: consistent ~5ms kept pool usage at ~4.5/10. VUs climbing
 
 ### Cache hit rate under 80/20
 
-80% of `get_product` traffic targets 200 IDs. At 60s TTL those keys warm in the first second and stay warm for the entire 30s run. Effective hit rate ~80% vs ~27% under uniform random.
+80% of `get_product` traffic targets 200 IDs. At 600s TTL those keys warm in the first second and stay warm for the entire 30s run. Effective hit rate ~80% vs ~27% under uniform random.
 
 The bimodal distribution is visible in the numbers: **med = 120µs** (Redis hit) vs **p(95) = 5.55ms** (DB miss). The gap between them is the cost of a Postgres round-trip.
 
 ### list_products — near-total cache coverage
 
-100 req/s across 50 distinct page keys (`offset` 0–1470, `limit` 30). At 60s TTL all 50 keys warm within the first second. **p(95) = 264µs** — effectively every request is a cache hit. This is the ceiling for what Redis cache-aside can deliver on a listing endpoint.
+100 req/s across 50 distinct page keys (`offset` 0–1470, `limit` 30). At 600s TTL all 50 keys warm within the first second. **p(95) = 264µs** — effectively every request is a cache hit. This is the ceiling for what Redis cache-aside can deliver on a listing endpoint.
 
 ### Async cache writes
 
@@ -114,7 +114,7 @@ Removing `await` from the cache `SET` path means the response no longer blocks o
 
 **194 dropped iterations** — VUs hit the 202 ceiling (maxVUs=200). The server wasn't failing; k6 ran out of pre-allocated virtual users to fire requests. Not a server-side failure — a benchmark config ceiling.
 
-**Throughput: 2493 req/s sustained**, 112 MB received. At this point the local setup is near its ceiling — Node.js single-threaded event loop + local Docker networking are the constraints, not the DB or Redis.
+**Throughput: 2493 req/s sustained**, 112 MB received.
 
 ---
 
