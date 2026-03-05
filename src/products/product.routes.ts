@@ -16,8 +16,8 @@ productRoutes.get("/", async (c) => {
 		1,
 		Math.min(MAX_LIMIT, Number(c.req.query("limit")) || DEFAULT_LIMIT),
 	);
-	const offset = Math.max(0, Number(c.req.query("offset")) || 0);
-	return c.json(await productService.listProducts(limit, offset));
+	const cursor = Math.max(0, Number(c.req.query("cursor")) || 0);
+	return c.json(await productService.listProducts(limit, cursor));
 });
 
 productRoutes.get("/:id", async (c) => {
