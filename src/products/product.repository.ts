@@ -32,7 +32,11 @@ export type UpdateProductInput = {
 };
 
 export const productRepository = {
-	async findAllListed(storeId: number, limit: number, cursor?: number): Promise<Product[]> {
+	async findAllListed(
+		storeId: number,
+		limit: number,
+		cursor?: number,
+	): Promise<Product[]> {
 		return db.shard(storeId).read<Product[]>`
       SELECT id, store_id AS "storeId", name, description, price, listed
       FROM products
@@ -44,7 +48,10 @@ export const productRepository = {
     `;
 	},
 
-	async findByIdPrimary(storeId: number, productId: number): Promise<ProductWithSkus | null> {
+	async findByIdPrimary(
+		storeId: number,
+		productId: number,
+	): Promise<ProductWithSkus | null> {
 		const rows = await db.shard(storeId).write<ProductWithSkus[]>`
       SELECT
         p.id,
@@ -67,7 +74,10 @@ export const productRepository = {
 		return rows[0] ?? null;
 	},
 
-	async findById(storeId: number, productId: number): Promise<ProductWithSkus | null> {
+	async findById(
+		storeId: number,
+		productId: number,
+	): Promise<ProductWithSkus | null> {
 		const rows = await db.shard(storeId).read<ProductWithSkus[]>`
       SELECT
         p.id,
@@ -99,7 +109,11 @@ export const productRepository = {
 		return rows[0];
 	},
 
-	async update(storeId: number, productId: number, input: UpdateProductInput): Promise<Product | null> {
+	async update(
+		storeId: number,
+		productId: number,
+		input: UpdateProductInput,
+	): Promise<Product | null> {
 		const rows = await db.shard(storeId).write<Product[]>`
       UPDATE products
       SET

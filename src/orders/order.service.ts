@@ -8,14 +8,12 @@ import {
 	type TxSql,
 } from "./order.repository.js";
 
-
 export class OrderConflictError extends Error {
 	constructor(message: string) {
 		super(message);
 		this.name = "OrderConflictError";
 	}
 }
-
 
 const redlock = new Redlock([getRedis()], {
 	retryCount: 3,
@@ -36,12 +34,16 @@ export const orderService = {
 
 		try {
 			// user lock first — prevents duplicate concurrent orders from same user
-			locks.push(await redlock.acquire([KEYS.order(userId)], DEFAULT_LOCK_DURATION));
+			locks.push(
+				await redlock.acquire([KEYS.order(userId)], DEFAULT_LOCK_DURATION),
+			);
 
 			// sort by skuId before acquiring — prevents deadlock between concurrent orders
 			const sortedItems = [...items].sort((a, b) => a.skuId - b.skuId);
 			for (const item of sortedItems) {
-				locks.push(await redlock.acquire([KEYS.sku(item.skuId)], DEFAULT_LOCK_DURATION));
+				locks.push(
+					await redlock.acquire([KEYS.sku(item.skuId)], DEFAULT_LOCK_DURATION),
+				);
 			}
 
 			return await db.shard(storeId).begin(async (sql) => {
@@ -67,9 +69,12 @@ export const orderService = {
 			throw err;
 		} finally {
 			await Promise.all(
-				locks.map(lock => lock.release().catch(err => console.warn("Failed to release lock:", err))));
+				locks.map((lock) =>
+					lock
+						.release()
+						.catch((err) => console.warn("Failed to release lock:", err)),
+				),
+			);
 		}
 	},
 };
-
-

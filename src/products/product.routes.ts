@@ -25,7 +25,11 @@ productRoutes.get("/stores/:storeId/products/:productId", async (c) => {
 	try {
 		const productId = Number(c.req.param("productId"));
 		const storeId = Number(c.req.param("storeId"));
-		const product = await productService.getByid(storeId, productId, c.get("forcePrimary"));
+		const product = await productService.getByid(
+			storeId,
+			productId,
+			c.get("forcePrimary"),
+		);
 		return c.json(product);
 	} catch (err) {
 		return c.json({ error: (err as Error).message }, 404);
@@ -48,7 +52,11 @@ productRoutes.put("/stores/:storeId/products/:productId", async (c) => {
 		const productId = Number(c.req.param("productId"));
 		const storeId = Number(c.req.param("storeId"));
 		const body = await c.req.json();
-		const product = await productService.updateProduct(storeId, productId, body);
+		const product = await productService.updateProduct(
+			storeId,
+			productId,
+			body,
+		);
 		return c.json(product, 200, { "x-write-token": String(Date.now()) });
 	} catch (err) {
 		return c.json({ error: (err as Error).message }, 404);

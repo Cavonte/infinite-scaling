@@ -8,7 +8,7 @@ import {
 
 const CACHE_TTL_SECONDS = 60;
 const KEYS = {
-	listKey: (storeId: number, limit: number, cursor?: number,) =>
+	listKey: (storeId: number, limit: number, cursor?: number) =>
 		`products:store:${storeId}:listed:cursor:${cursor ?? 0}:limit:${limit}`,
 	listPattern: (storeId: number) => `products:store:${storeId}:listed:*`,
 	product: (productId: number) => `products:${productId}`,
@@ -23,7 +23,11 @@ export const productService = {
 			if (cached) return JSON.parse(cached);
 		}
 
-		const products = await productRepository.findAllListed(storeId, limit, cursor);
+		const products = await productRepository.findAllListed(
+			storeId,
+			limit,
+			cursor,
+		);
 
 		if (features.redisCache) {
 			setKey(
@@ -36,7 +40,11 @@ export const productService = {
 		return products;
 	},
 
-	async getByid(storeId: number, productId: number, forcePrimary: boolean = false) {
+	async getByid(
+		storeId: number,
+		productId: number,
+		forcePrimary: boolean = false,
+	) {
 		if (features.redisCache) {
 			const cached = await getKey(KEYS.product(productId));
 			if (cached) return JSON.parse(cached);
@@ -48,7 +56,11 @@ export const productService = {
 		if (!product) throw new Error(`Product ${productId} not found`);
 
 		if (features.redisCache) {
-			setKey(KEYS.product(productId), JSON.stringify(product), CACHE_TTL_SECONDS);
+			setKey(
+				KEYS.product(productId),
+				JSON.stringify(product),
+				CACHE_TTL_SECONDS,
+			);
 		}
 
 		return product;
@@ -67,7 +79,11 @@ export const productService = {
 		return product;
 	},
 
-	async updateProduct(storeId: number, productId: number, input: UpdateProductInput) {
+	async updateProduct(
+		storeId: number,
+		productId: number,
+		input: UpdateProductInput,
+	) {
 		const product = await productRepository.update(storeId, productId, input);
 		if (!product) throw new Error(`Product ${productId} not found`);
 
