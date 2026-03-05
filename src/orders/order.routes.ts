@@ -3,7 +3,7 @@ import { orderService, OrderConflictError } from "./order.service.js";
 
 export const orderRoutes = new Hono();
 
-orderRoutes.post("stores/:storeId/orders", async (c) => {
+orderRoutes.post("/stores/:storeId/orders", async (c) => {
 	try {
 		const storeId = Number(c.req.param("storeId"));
 		const { userId, items } = await c.req.json();

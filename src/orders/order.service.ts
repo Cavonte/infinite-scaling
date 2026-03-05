@@ -9,6 +9,14 @@ import {
 } from "./order.repository.js";
 
 
+export class OrderConflictError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "OrderConflictError";
+	}
+}
+
+
 const redlock = new Redlock([getRedis()], {
 	retryCount: 3,
 	retryDelay: 100,
@@ -36,7 +44,7 @@ export const orderService = {
 				locks.push(await redlock.acquire([KEYS.sku(item.skuId)], DEFAULT_LOCK_DURATION));
 			}
 
-			return await db.write.begin(async (sql) => {
+			return await db.shard(storeId).begin(async (sql) => {
 				const tx = sql as TxSql;
 
 				for (const item of items) {
@@ -65,9 +73,3 @@ export const orderService = {
 };
 
 
-export class OrderConflictError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "OrderConflictError";
-	}
-}

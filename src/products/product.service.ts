@@ -8,7 +8,7 @@ import {
 
 const CACHE_TTL_SECONDS = 60;
 const KEYS = {
-	listKey: (storeId: number, cursor?: number, limit: number) =>
+	listKey: (storeId: number, limit: number, cursor?: number,) =>
 		`products:store:${storeId}:listed:cursor:${cursor ?? 0}:limit:${limit}`,
 	listPattern: (storeId: number) => `products:store:${storeId}:listed:*`,
 	product: (productId: number) => `products:${productId}`,
@@ -18,7 +18,7 @@ export const productService = {
 	async listProducts(storeId: number, limit: number, cursor?: number) {
 		if (features.redisCache) {
 			console.log("Cache Hit");
-			const key = KEYS.listKey(storeId, cursor, limit);
+			const key = KEYS.listKey(storeId, limit, cursor);
 			const cached = await getKey(key);
 			if (cached) return JSON.parse(cached);
 		}
@@ -27,7 +27,7 @@ export const productService = {
 
 		if (features.redisCache) {
 			setKey(
-				KEYS.listKey(storeId, cursor, limit),
+				KEYS.listKey(storeId, limit, cursor),
 				JSON.stringify(products),
 				CACHE_TTL_SECONDS,
 			);

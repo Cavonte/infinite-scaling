@@ -38,14 +38,14 @@ export const productRepository = {
       FROM products
       WHERE listed = true
       AND store_id = ${storeId}
-      AND id > ${cursor}
+      AND id > ${cursor ?? 0}
       ORDER BY id
       LIMIT ${limit}
     `;
 	},
 
 	async findByIdPrimary(storeId: number, productId: number): Promise<ProductWithSkus | null> {
-		const rows = await db.write<ProductWithSkus[]>`
+		const rows = await db.shard(storeId)<ProductWithSkus[]>`
       SELECT
       p.id,
       p.store_id AS "storeId",
@@ -68,6 +68,8 @@ export const productRepository = {
 		return rows[0] ?? null;
 	},
 
+    // Note: partial sharding breaks read replicas. See db_router.ts. Normally each shard would have its own read replicas.
+    // This is demo so for now
 	async findById(storeId: number, productId: number): Promise<ProductWithSkus | null> {
 		const rows = await db.read<ProductWithSkus[]>`
       SELECT
@@ -92,7 +94,7 @@ export const productRepository = {
 	},
 
 	async create(storeId: number, input: CreateProductInput): Promise<Product> {
-		const rows = await db.write<Product[]>`
+		const rows = await db.shard(storeId)<Product[]>`
       INSERT INTO products (store_id, name, description, price, listed)
       VALUES (${storeId}, ${input.name}, ${input.description ?? null}, ${input.price}, ${input.listed ?? false})
       RETURNING id, store_id AS "storeId", name, description, price, listed
@@ -101,7 +103,7 @@ export const productRepository = {
 	},
 
 	async update(storeId: number, productId: number, input: UpdateProductInput): Promise<Product | null> {
-		const rows = await db.write<Product[]>`
+		const rows = await db.shard(storeId)<Product[]>`
       UPDATE products
       SET
         name        = COALESCE(${input.name ?? null}, name),
@@ -116,7 +118,7 @@ export const productRepository = {
 	},
 
 	async delete(storeId: number, productId: number): Promise<boolean> {
-		const rows = await db.write<{ id: number }[]>`
+		const rows = await db.shard(storeId)<{ id: number }[]>`
       DELETE FROM products WHERE id = ${productId} AND store_id = ${storeId} RETURNING id
     `;
 		return rows.length > 0;
