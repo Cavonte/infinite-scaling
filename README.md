@@ -1,6 +1,6 @@
 # Sample Large Scale App
 
-A progressive Node.js/TypeScript API exploring real-world scaling patterns. This is is a demo and referrence for read replicas, Redis caching, rate limiting, distributed locks, and sharding.
+A progressive Node.js/TypeScript API exploring real-world scaling patterns. This is a demo and referrence for read replicas, Redis caching, distribution lock, rate limiting and sharding.
 
 See outcomes and analysis in benchMark folder
 
