@@ -19,4 +19,3 @@ orderRoutes.post("/", async (c) => {
 		return c.json({ error: (err as Error).message }, 500);
 	}
 });
-

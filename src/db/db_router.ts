@@ -3,9 +3,14 @@ import { env } from "../config/env.js";
 import { features } from "../config/features.js";
 
 const main = postgres(env.databaseUrl, { max: 10 });
+
 const replicas = [
 	postgres(env.databaseUrlReplica1, { max: 50 }),
 	postgres(env.databaseUrlReplica2, { max: 50 }),
+];
+const shards = [
+	postgres(env.databaseUrlShard1, { max: 10 }),
+	postgres(env.databaseUrlShard2, { max: 10 }),
 ];
 
 let counter = 0;
@@ -34,9 +39,22 @@ function read<T extends postgres.Row[] = postgres.Row[]>(
 	});
 }
 
+function getShard(storeId: number): postgres.Sql {
+	if (!features.sharding) {
+		return main;
+	}
+
+	const shardNumber = storeId % shards.length;
+
+	console.log(`Using ${shardNumber}`);
+
+	return shards[shardNumber];
+}
+
 export const db = {
 	read,
 	get write(): postgres.Sql {
 		return main;
 	},
+	shard: getShard,
 };

@@ -13,5 +13,7 @@ export const env = {
 	databaseUrl: required("DATABASE_URL"),
 	databaseUrlReplica1: required("DATABASE_URL_REPLICA_1"),
 	databaseUrlReplica2: required("DATABASE_URL_REPLICA_2"),
+	databaseUrlShard1: required("DATABASE_URL_SHARD_1"),
+	databaseUrlShard2: required("DATABASE_URL_SHARD_2"),
 	redisUrl: required("REDIS_URL"),
 } as const;
