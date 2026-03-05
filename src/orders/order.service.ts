@@ -8,11 +8,23 @@ import {
 	type TxSql,
 } from "./order.repository.js";
 
+export class OrderConflictError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "OrderConflictError";
+	}
+}
+
 const redlock = new Redlock([getRedis()], {
 	retryCount: 3,
 	retryDelay: 100,
 	retryJitter: 50,
 });
+
+const KEYS = {
+	sku: (id: number) => `lock:sku:${id}`,
+	order: (userId: number) => `store:order:${userId}`,
+} as const;
 
 const DEFAULT_LOCK_DURATION = 5000;
 
@@ -21,16 +33,13 @@ export const orderService = {
 		const locks: Lock[] = [];
 
 		try {
-			//Sort the items by skuid to avoid deadlock
+			// user lock first — prevents duplicate concurrent orders from same user
+			locks.push(await redlock.acquire([KEYS.order(userId)], DEFAULT_LOCK_DURATION));
+
+			// sort by skuId before acquiring — prevents deadlock between concurrent orders
 			const sortedItems = [...items].sort((a, b) => a.skuId - b.skuId);
-			// Acquire lock for all items
 			for (const item of sortedItems) {
-				locks.push(
-					await redlock.acquire(
-						[`lock:sku:${item.skuId}`],
-						DEFAULT_LOCK_DURATION,
-					),
-				);
+				locks.push(await redlock.acquire([KEYS.sku(item.skuId)], DEFAULT_LOCK_DURATION));
 			}
 
 			return await db.write.begin(async (sql) => {
@@ -51,15 +60,12 @@ export const orderService = {
 			});
 		} catch (err) {
 			if (err instanceof ExecutionError) {
-				throw new Error(
-					"Could not acquire lock — too much contention, try again",
-				);
+				throw new OrderConflictError("Could not acquire lock, try again");
 			}
 			throw err;
 		} finally {
-			for (const lock of locks) {
-				await lock.release();
-			}
+			await Promise.all(
+				locks.map(lock => lock.release().catch(err => console.warn("Failed to release lock:", err))));
 		}
 	},
 };

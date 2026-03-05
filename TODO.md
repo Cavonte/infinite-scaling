@@ -48,9 +48,9 @@
 - [x] Add list_products scenario to benchmark (paged, 100 req/s)
 
 ## Phase 6: Redis — Distributed Locks
-- [ ] Implement Redlock pattern for order submission
-- [ ] Prevent double-order: acquire lock on `store:order:customer_id`
-- [ ] Test: concurrent order submissions, only one succeeds
+- [x] Implement Redlock pattern for order submission
+- [x] Prevent double-order: acquire lock on `store:order:customer_id`
+- [x] Test: concurrent order submissions, only one succeeds
 
 ## Phase 7: Sharding
 - [ ] Create shard map config (store_id ranges -> PG connection strings)

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { orderService } from "./order.service.js";
+import { orderService, OrderConflictError } from "./order.service.js";
 
 export const orderRoutes = new Hono();
 
@@ -13,14 +13,10 @@ orderRoutes.post("/", async (c) => {
 		const order = await orderService.placeOrder(userId, items);
 		return c.json(order, 201);
 	} catch (err) {
-		const message = (err as Error).message;
-		if (
-			message.includes("Insufficient stock") ||
-			message.includes("contention")
-		) {
-			return c.json({ error: message }, 409);
+		if (err instanceof OrderConflictError) {
+			return c.json({ error: (err as Error).message }, 409);
 		}
-		return c.json({ error: message }, 500);
+		return c.json({ error: (err as Error).message }, 500);
 	}
 });
 
