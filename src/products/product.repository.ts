@@ -33,7 +33,7 @@ export type UpdateProductInput = {
 
 export const productRepository = {
 	async findAllListed(storeId: number, limit: number, cursor?: number): Promise<Product[]> {
-		return db.read<Product[]>`
+		return db.shard(storeId).read<Product[]>`
       SELECT id, store_id AS "storeId", name, description, price, listed
       FROM products
       WHERE listed = true
@@ -45,33 +45,7 @@ export const productRepository = {
 	},
 
 	async findByIdPrimary(storeId: number, productId: number): Promise<ProductWithSkus | null> {
-		const rows = await db.shard(storeId)<ProductWithSkus[]>`
-      SELECT
-      p.id,
-      p.store_id AS "storeId",
-      p.name,
-      p.description,
-      p.price,
-      p.listed,
-      COALESCE(
-        json_agg(json_build_object('id', s.id, 'description', s.description, 'supply', s.supply))
-        FILTER (WHERE s.id IS NOT NULL),
-               '[]'
-      ) AS skus
-      FROM products p
-
-      LEFT JOIN skus s ON s.product_id = p.id
-      WHERE p.id = ${productId}
-      AND store_id = ${storeId}
-      GROUP BY p.id
-      `;
-		return rows[0] ?? null;
-	},
-
-    // Note: partial sharding breaks read replicas. See db_router.ts. Normally each shard would have its own read replicas.
-    // This is demo so for now
-	async findById(storeId: number, productId: number): Promise<ProductWithSkus | null> {
-		const rows = await db.read<ProductWithSkus[]>`
+		const rows = await db.shard(storeId).write<ProductWithSkus[]>`
       SELECT
         p.id,
         p.store_id AS "storeId",
@@ -87,14 +61,37 @@ export const productRepository = {
       FROM products p
       LEFT JOIN skus s ON s.product_id = p.id
       WHERE p.id = ${productId}
-      AND store_id = ${storeId}
+      AND p.store_id = ${storeId}
+      GROUP BY p.id
+    `;
+		return rows[0] ?? null;
+	},
+
+	async findById(storeId: number, productId: number): Promise<ProductWithSkus | null> {
+		const rows = await db.shard(storeId).read<ProductWithSkus[]>`
+      SELECT
+        p.id,
+        p.store_id AS "storeId",
+        p.name,
+        p.description,
+        p.price,
+        p.listed,
+        COALESCE(
+          json_agg(json_build_object('id', s.id, 'description', s.description, 'supply', s.supply))
+          FILTER (WHERE s.id IS NOT NULL),
+          '[]'
+        ) AS skus
+      FROM products p
+      LEFT JOIN skus s ON s.product_id = p.id
+      WHERE p.id = ${productId}
+      AND p.store_id = ${storeId}
       GROUP BY p.id
     `;
 		return rows[0] ?? null;
 	},
 
 	async create(storeId: number, input: CreateProductInput): Promise<Product> {
-		const rows = await db.shard(storeId)<Product[]>`
+		const rows = await db.shard(storeId).write<Product[]>`
       INSERT INTO products (store_id, name, description, price, listed)
       VALUES (${storeId}, ${input.name}, ${input.description ?? null}, ${input.price}, ${input.listed ?? false})
       RETURNING id, store_id AS "storeId", name, description, price, listed
@@ -103,7 +100,7 @@ export const productRepository = {
 	},
 
 	async update(storeId: number, productId: number, input: UpdateProductInput): Promise<Product | null> {
-		const rows = await db.shard(storeId)<Product[]>`
+		const rows = await db.shard(storeId).write<Product[]>`
       UPDATE products
       SET
         name        = COALESCE(${input.name ?? null}, name),
@@ -118,7 +115,7 @@ export const productRepository = {
 	},
 
 	async delete(storeId: number, productId: number): Promise<boolean> {
-		const rows = await db.shard(storeId)<{ id: number }[]>`
+		const rows = await db.shard(storeId).write<{ id: number }[]>`
       DELETE FROM products WHERE id = ${productId} AND store_id = ${storeId} RETURNING id
     `;
 		return rows.length > 0;
