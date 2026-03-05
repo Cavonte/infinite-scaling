@@ -47,7 +47,12 @@
 - [x] Increase replica connection pool (max: 10 → 50) and retest replica saturation point
 - [x] Add list_products scenario to benchmark (paged, 100 req/s)
 
-## Phase 6: Sharding
+## Phase 6: Redis — Distributed Locks
+- [ ] Implement Redlock pattern for order submission
+- [ ] Prevent double-order: acquire lock on `store:order:customer_id`
+- [ ] Test: concurrent order submissions, only one succeeds
+
+## Phase 7: Sharding
 - [ ] Create shard map config (store_id ranges -> PG connection strings)
 - [ ] Build `ShardRouter` class (resolves shard key to Drizzle instance)
 - [ ] Update Docker Compose to run multiple PG instances (2-3 shards)
@@ -60,22 +65,17 @@
 - [ ] Re-run with mixed read/write load to properly benchmark replica offloading
 - [ ] Collect results for sharding phase once implemented
 
-## Phase 7.1: Redis — Distributed Locks
-- [ ] Implement Redlock pattern for order submission
-- [ ] Prevent double-order: acquire lock on `store:order:customer_id`
-- [ ] Test: concurrent order submissions, only one succeeds
-
-## Phase 7.2: Redis — Session & Cart Storage
+## Phase 8.1: Redis — Session & Cart Storage
 - [ ] Implement cart storage in Redis (hash per cart, TTL expiry)
 - [ ] API endpoints: add to cart, view cart, remove from cart
 - [ ] Test: cart persists across requests, expires after TTL
 
-## Phase 7.3: Redis — Rate Limiting
+## Phase 8.2: Redis — Rate Limiting
 - [ ] Implement sliding window rate limiter middleware
 - [ ] Apply to API endpoints (e.g., max 100 requests/minute)
 - [ ] Test: verify requests are blocked after limit exceeded
 
-## Phase 8: Circuit Breaker
+## Phase 8.3: Circuit Breaker
 - [ ] Implement circuit breaker for database connections (open/half-open/closed states)
 - [ ] Track failure rate per shard — open circuit on threshold breach
 - [ ] Probe with single request in half-open state before closing

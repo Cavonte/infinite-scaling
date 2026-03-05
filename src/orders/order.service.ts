@@ -21,15 +21,27 @@ export const orderService = {
 		const locks: Lock[] = [];
 
 		try {
-			for (const item of items) {
-				locks.push(await redlock.acquire([`lock:sku:${item.skuId}`], DEFAULT_LOCK_DURATION));
+			//Sort the items by skuid to avoid deadlock
+			const sortedItems = [...items].sort((a, b) => a.skuId - b.skuId);
+			// Acquire lock for all items
+			for (const item of sortedItems) {
+				locks.push(
+					await redlock.acquire(
+						[`lock:sku:${item.skuId}`],
+						DEFAULT_LOCK_DURATION,
+					),
+				);
 			}
 
 			return await db.write.begin(async (sql) => {
 				const tx = sql as TxSql;
 
 				for (const item of items) {
-					const supply = await orderRepository.decrementSupply(item.skuId, item.quantity, tx);
+					const supply = await orderRepository.decrementSupply(
+						item.skuId,
+						item.quantity,
+						tx,
+					);
 					if (supply === null) {
 						throw new Error(`Insufficient stock for SKU ${item.skuId}`);
 					}
@@ -39,7 +51,9 @@ export const orderService = {
 			});
 		} catch (err) {
 			if (err instanceof ExecutionError) {
-				throw new Error("Could not acquire lock — too much contention, try again");
+				throw new Error(
+					"Could not acquire lock — too much contention, try again",
+				);
 			}
 			throw err;
 		} finally {
