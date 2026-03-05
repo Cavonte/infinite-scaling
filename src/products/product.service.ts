@@ -6,7 +6,7 @@ import {
 	type UpdateProductInput,
 } from "./product.repository.js";
 
-const CACHE_TTL_SECONDS = 600;
+const CACHE_TTL_SECONDS = 60;
 const KEYS = {
 	listKey: (cursor?: number, limit: number) =>
 		`products:listed:cursor:${cursor ?? 0}:limit:${limit}`,

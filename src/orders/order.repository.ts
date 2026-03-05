@@ -1,5 +1,7 @@
 import type postgres from "postgres";
 
+export type TxSql = postgres.Sql & { readonly __tx: unique symbol };
+
 export type Sku = {
 	id: number;
 	supply: number;
@@ -18,14 +20,11 @@ export type Order = {
 };
 
 export const orderRepository = {
-	async findSkuForUpdate(skuId: number, sql: postgres.Sql): Promise<Sku | null> {
-		const rows = await sql<Sku[]>`
-			SELECT id, supply FROM skus WHERE id = ${skuId} FOR UPDATE
-		`;
-		return rows[0] ?? null;
-	},
-
-	async decrementSupply(skuId: number, quantity: number, sql: postgres.Sql): Promise<Sku | null> {
+	async decrementSupply(
+		skuId: number,
+		quantity: number,
+		sql: TxSql,
+	): Promise<Sku | null> {
 		const rows = await sql<Sku[]>`
 			UPDATE skus
 			SET supply = supply - ${quantity}
@@ -35,7 +34,11 @@ export const orderRepository = {
 		return rows[0] ?? null;
 	},
 
-	async createOrder(userId: number, items: OrderItem[], sql: postgres.Sql): Promise<Order> {
+	async createOrder(
+		userId: number,
+		items: OrderItem[],
+		sql: TxSql,
+	): Promise<Order> {
 		const rows = await sql<Order[]>`
 			INSERT INTO orders (user_id) VALUES (${userId}) RETURNING id, user_id
 		`;
