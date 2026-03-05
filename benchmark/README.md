@@ -166,6 +166,70 @@ The local setup constraints at this point are: Node.js single-threaded event loo
 
 ---
 
+---
+
+---
+
+# Suite 2 — Mixed Read/Write Load (Validating Read Replicas)
+
+**New scenario added:** `update_product` at 200/s targeting IDs 201–1200 (outside hot read pool).
+**Goal:** demonstrate read replica value under real write pressure.
+
+## Suite 2 Summary
+
+| Run | get p(95) | list p(95) | update p(95) | Dropped | Avg VUs |
+|---|---|---|---|---|---|
+| Baseline | 684ms | 679ms | 679ms | 136,007 | 676 |
+| Redis cache | 468ms | 587ms | 684ms | 6,566 | 13 |
+| Redis + Replicas | 13.48ms | 7.91ms | 9.42ms | 814 | 15 |
+
+---
+
+## Suite 2 — Round 1: Baseline (no replicas, no cache)
+
+**Load:** get_product 5000/s + list_products 1000/s + update_product 200/s
+
+| Metric | get_product | list_products | update_product |
+|---|---|---|---|
+| med | 407ms | 400ms | 404ms |
+| p(95) | 684ms | 679ms | 679ms |
+
+**Dropped: 136,007 / ~186k. VUs: 676/700.**
+
+All three scenarios share the same primary pool. Writes hold connections longer (WAL flush); reads queue behind them. The ~400ms median across all scenarios is connection wait time, not query time — the pool is exhausted. 136k dropped iterations confirm the server fell behind immediately.
+
+---
+
+## Suite 2 — Round 2: Redis cache (no replicas)
+
+**Load:** get_product 5000/s + list_products 1000/s + update_product 200/s
+
+| Metric | get_product | list_products | update_product |
+|---|---|---|---|
+| med | 755µs | 1.21ms | 258ms |
+| p(95) | 468ms | 587ms | 684ms |
+
+**Dropped: 6,566. Avg VUs: 13.**
+
+Cache absorbed ~80% of read load — VUs collapsed from 676 to 13. `get_product` med (755µs) vs p(95) (468ms) shows the bimodal split: hot cache hits vs cold misses hitting the DB. `update_product` p(95) is unchanged at 684ms — writes bypass cache and still compete with cold reads on the primary. That remaining tail is what replicas should fix.
+
+---
+
+## Suite 2 — Round 3: Redis + Read replicas
+
+**Load:** get_product 5000/s + list_products 1000/s + update_product 200/s
+
+| Metric | get_product | list_products | update_product |
+|---|---|---|---|
+| med | 812µs | 805µs | 2.64ms |
+| p(95) | 13.48ms | 7.91ms | 9.42ms |
+
+**Dropped: 814. Avg VUs: 15. All thresholds passed. ✅**
+
+The `update_product` result is the signal: p(95) dropped from 684ms (Redis-only) to 9.42ms. Reads are now off the primary — replicas handle cold read misses, leaving the primary exclusively for writes. Cache + replicas are complementary: cache eliminates ~80% of reads entirely, replicas absorb the remaining 20%, primary handles writes uncontested.
+
+---
+
 ## Key takeaways
 
 | Finding | Detail |

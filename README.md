@@ -1,6 +1,8 @@
-# Sample Large Scale App
+# Sample Large Scale Online Store
 
-A progressive Node.js/TypeScript API exploring real-world scaling patterns. This is a demo and referrence for read replicas, Redis caching, distribution lock, rate limiting and sharding.
+A progressive Node.js/TypeScript API exploring real-world scaling patterns in the context of an online store. This is a demo and referrence for read replicas, Redis caching, distribution lock, rate limiting and sharding.
+
+The store features products management, user management, order management.
 
 See outcomes and analysis in benchMark folder
 

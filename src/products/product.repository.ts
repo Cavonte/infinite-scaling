@@ -33,14 +33,14 @@ export type UpdateProductInput = {
 };
 
 export const productRepository = {
-	async findAllListed(limit: number, offset: number): Promise<Product[]> {
+	async findAllListed(limit: number, cursor?: number): Promise<Product[]> {
 		return db.read<Product[]>`
       SELECT id, store_id AS "storeId", name, description, price, listed
       FROM products
       WHERE listed = true
+      AND id > ${cursor}
       ORDER BY id
       LIMIT ${limit}
-      OFFSET ${offset}
     `;
 	},
 
