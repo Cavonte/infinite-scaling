@@ -23,7 +23,7 @@ const KEYS = {
 const DEFAULT_LOCK_DURATION = 5000;
 
 export const orderService = {
-	async placeOrder(userId: number, items: OrderItem[]) {
+	async placeOrder(storeId: number, userId: number, items: OrderItem[]) {
 		const locks: Lock[] = [];
 
 		try {
