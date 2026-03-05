@@ -6,7 +6,7 @@ const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
 const MAX_PRODUCT_ID = 100000;
 const HOT_PRODUCT_COUNT = 200; // top products that get 80% of traffic
 const LIST_PAGE_SIZE = 30;
-const LIST_MAX_PAGES = 50; // browse up to page 50 (offsets 0–1470)
+const LIST_CURSOR_COUNT = 50; // number of distinct cursors to simulate (spread across product IDs)
 const WRITE_POOL_START = HOT_PRODUCT_COUNT + 1; // 201 — separate from hot read pool
 const WRITE_POOL_SIZE = 1000; // fixed pool of products to update — keeps dataset stable
 
@@ -49,9 +49,10 @@ export const options = {
 };
 
 export function listProducts() {
-  const page = Math.floor(Math.random() * LIST_MAX_PAGES);
-  const offset = page * LIST_PAGE_SIZE;
-  const res = http.get(`${BASE_URL}/products?limit=${LIST_PAGE_SIZE}&offset=${offset}`);
+  // simulate browsing different pages by spreading cursors evenly across product ID space
+  const cursorIndex = Math.floor(Math.random() * LIST_CURSOR_COUNT);
+  const cursor = cursorIndex * LIST_PAGE_SIZE;
+  const res = http.get(`${BASE_URL}/products?limit=${LIST_PAGE_SIZE}&cursor=${cursor}`);
   check(res, {
     "list: status 200": (r) => r.status === 200,
   });
