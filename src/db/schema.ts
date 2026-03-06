@@ -43,9 +43,7 @@ export const users = pgTable("users", {
 
 export const orders = pgTable("orders", {
 	id: serial("id").primaryKey(),
-	userId: integer("user_id")
-		.notNull()
-		.references(() => users.id),
+	userId: integer("user_id").notNull(),
 	status: text("status").notNull().default("pending"),
 	createdAt: timestamp("created_at").notNull().defaultNow(),
 	updatedAt: timestamp("updated_at").notNull().defaultNow(),
