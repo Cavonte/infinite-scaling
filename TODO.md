@@ -51,30 +51,20 @@
 - [x] Test: concurrent order submissions, only one succeeds
 
 ## Phase 7: Sharding
-- [ ] Create shard map config (store_id ranges -> PG connection strings)
-- [ ] Update Docker Compose to run multiple PG instances (2-3 shards)
-- [ ] Run migrations across all shards
-- [ ] Test: create stores on different shards, query correctly
+- [x] Create shard map config (`store_id % 2` routing in `db_router.ts`, `db.shard(storeId).read/write`)
+- [x] Update Docker Compose to run multiple PG instances (pg-shard-1/2 + replicas on ports 5435-5438)
+- [x] Run migrations across all shards
+- [x] Seed shards: stores as reference table (duplicated), products/skus distributed by store_id, explicit IDs to prevent sequence divergence
+- [x] Test: placed orders against even/odd stores, verified SKU decrement on correct shard + order on primary
+- [x] Order flow: two-transaction saga — tx1 decrementSupply on shard, tx2 createOrder on primary, compensation on failure
+- [x] Dropped `orders.user_id` FK — user existence validated at app layer before lock acquisition
 - [ ] Failure scenario: take down one shard — what does the API return?
-- [ ] Re-run with mixed read/write load to properly benchmark replica offloading
-- [ ] Collect results for sharding phase once implemented
+- [ ] Re-run with mixed read/write load to benchmark shard write distribution
 
-## Phase 8.1: Redis — Session & Cart Storage
-- [ ] Implement cart storage in Redis (hash per cart, TTL expiry)
-- [ ] API endpoints: add to cart, view cart, remove from cart
-- [ ] Test: cart persists across requests, expires after TTL
-
-## Phase 8.2: Redis — Rate Limiting
+## Phase 8: Redis — Rate Limiting
 - [ ] Implement sliding window rate limiter middleware
 - [ ] Apply to API endpoints (e.g., max 100 requests/minute)
 - [ ] Test: verify requests are blocked after limit exceeded
-
-## Phase 8.3: Circuit Breaker
-- [ ] Implement circuit breaker for database connections (open/half-open/closed states)
-- [ ] Track failure rate per shard — open circuit on threshold breach
-- [ ] Probe with single request in half-open state before closing
-- [ ] Test: force shard failure, verify circuit opens and requests fail fast
-- [ ] Document: why fail-fast is better than hanging threads
 
 ## Phase 9: Polish & Interview Prep
 - [ ] Add API documentation / route summary
@@ -82,3 +72,4 @@
 - [ ] Prepare talking points for each scaling pattern (see system_design_drills.md)
 - [ ] Document one real failure you encountered per phase and how you fixed it
 - [ ] Summarize benchmark results with before/after comparisons
+

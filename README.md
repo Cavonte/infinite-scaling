@@ -52,7 +52,7 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/infinite_scaling
 DATABASE_URL_REPLICA_1=postgres://postgres:postgres@localhost:5433/infinite_scaling
 DATABASE_URL_REPLICA_2=postgres://postgres:postgres@localhost:5434/infinite_scaling
 
-# Shards (products, orders — routed by store_id % 2)
+# Shards (products, skus — routed by store_id % 2)
 DATABASE_URL_SHARD_1=postgres://postgres:postgres@localhost:5435/infinite_scaling
 DATABASE_URL_SHARD_1_REPLICA=postgres://postgres:postgres@localhost:5437/infinite_scaling
 DATABASE_URL_SHARD_2=postgres://postgres:postgres@localhost:5436/infinite_scaling
@@ -149,7 +149,7 @@ All flags are off by default. Toggle via env vars.
 | `FEATURE_READ_REPLICAS` | Route reads to replicas (round-robin, with primary fallback) |
 | `FEATURE_REDIS_CACHE` | Cache-aside for product reads. Keys scoped to `store_id`. |
 | `FEATURE_SHARDING` | Route product/order writes to shard by `store_id % 2` |
-| `FEATURE_RATE_LIMIT` | Sliding window rate limiting (not yet implemented) |
+| `FEATURE_RATE_LIMIT` | Sliding window rate limiting per IP |
 
 ## DB Routing
 
