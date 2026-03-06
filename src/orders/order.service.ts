@@ -46,22 +46,38 @@ export const orderService = {
 				);
 			}
 
-			return await db.shard(storeId).begin(async (sql) => {
+			// Validate user exists before burning lock window, users are on the primary i.e. not sharded
+			const userRows = await db.read`SELECT id FROM users WHERE id = ${userId} LIMIT 1`;
+			if (!userRows[0]) throw new Error(`User ${userId} not found`);
+
+			// tx1: decrement supply on the correct shard
+			await db.shard(storeId).write.begin(async (sql) => {
 				const tx = sql as TxSql;
-
+				// Promise all is not ideal here
 				for (const item of items) {
-					const supply = await orderRepository.decrementSupply(
-						item.skuId,
-						item.quantity,
-						tx,
-					);
-					if (supply === null) {
-						throw new Error(`Insufficient stock for SKU ${item.skuId}`);
-					}
+					const sku = await orderRepository.decrementSupply(item.skuId, item.quantity, tx);
+					if (sku === null) throw new Error(`Insufficient stock for SKU ${item.skuId}`);
 				}
-
-				return orderRepository.createOrder(userId, items, tx);
 			});
+
+			// tx2: create order record on primary
+			try {
+				return await db.write.begin(async (sql) => {
+					const tx = sql as TxSql;
+					return orderRepository.createOrder(userId, items, tx);
+				});
+			} catch (err) {
+				// Compensate: restore supply on shard if order creation failed
+				await db.shard(storeId).write.begin(async (sql) => {
+					const tx = sql as TxSql;
+					for (const item of items) {
+						await orderRepository.incrementSupply(item.skuId, item.quantity, tx);
+					}
+				}).catch((compensateErr) =>
+					console.error("Compensation failed — inventory may be inconsistent:", compensateErr),
+				);
+				throw err;
+			}
 		} catch (err) {
 			if (err instanceof ExecutionError) {
 				throw new OrderConflictError("Could not acquire lock, try again");

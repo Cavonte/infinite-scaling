@@ -35,6 +35,18 @@ export const orderRepository = {
 		return rows[0] ?? null;
 	},
 
+	async incrementSupply(
+		skuId: number,
+		quantity: number,
+		sql: TxSql,
+	): Promise<void> {
+		await sql`
+			UPDATE skus
+			SET supply = supply + ${quantity}
+			WHERE id = ${skuId}
+		`;
+	},
+
 	async createOrder(
 		userId: number,
 		items: OrderItem[],
