@@ -45,7 +45,6 @@
 - [x] Increase replica connection pool (max: 10 → 50) and retest replica saturation point
 - [x] Add list_products scenario to benchmark (paged, 100 req/s)
 
-
 ## Phase 6: Redis — Distributed Locks
 - [x] Implement Redlock pattern for order submission
 - [x] Prevent double-order: acquire lock on `store:order:customer_id`
@@ -53,14 +52,10 @@
 
 ## Phase 7: Sharding
 - [ ] Create shard map config (store_id ranges -> PG connection strings)
-- [ ] Build `ShardRouter` class (resolves shard key to Drizzle instance)
 - [ ] Update Docker Compose to run multiple PG instances (2-3 shards)
 - [ ] Run migrations across all shards
-- [ ] Build API endpoints that route through ShardRouter
 - [ ] Test: create stores on different shards, query correctly
-- [ ] Document: how cross-shard queries are handled (or explicitly not supported)
 - [ ] Failure scenario: take down one shard — what does the API return?
-- [ ] Run benchmark 6: mixed read/write (proper replica test)
 - [ ] Re-run with mixed read/write load to properly benchmark replica offloading
 - [ ] Collect results for sharding phase once implemented
 

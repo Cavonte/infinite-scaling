@@ -1,8 +1,10 @@
 # Sample Large Scale Online Store
 
-A progressive Node.js/TypeScript API exploring real-world scaling patterns in the context of an online store. This is a demo and reference for read replicas, Redis caching, distributed locks, rate limiting and sharding.
+A progressive Node.js/TypeScript API exploring real-world scaling patterns in the context of an online store. 
+This is a demo and reference for read replicas, Redis caching, distributed locks, rate limiting and sharding.
 
-The store features products management, user management, and order management. Products and orders are scoped to stores, enabling shard routing by `store_id`.
+The store features products management, user management, and order management. 
+Products and orders are scoped to stores, enabling shard routing by `store_id`.
 
 See outcomes and analysis in the `benchmark/` folder.
 
@@ -64,17 +66,39 @@ FEATURE_READ_REPLICAS=false
 FEATURE_REDIS_CACHE=false
 FEATURE_SHARDING=false
 FEATURE_RATE_LIMIT=false
-FEATURE_DISTRIBUTED_LOCKS=false
 ```
 
 ### 3. Run migrations and seed
 
-Migrations must be run against all databases — primary and both shards.
+Migrations must be run against all databases
 
 ```bash
+# Primary
 pnpm db:migrate
-pnpm db:seed
+
+# Shards
+DATABASE_URL=postgres://postgres:postgres@localhost:5435/infinite_scaling pnpm db:migrate
+DATABASE_URL=postgres://postgres:postgres@localhost:5436/infinite_scaling pnpm db:migrate
 ```
+
+Seed with sharding enabled so data is distributed correctly:
+
+```bash
+FEATURE_SHARDING=true pnpm db:seed
+```
+
+#### What the seed writes where
+
+| Table | Primary | Shard 1 (even store_ids) | Shard 2 (odd store_ids) |
+|---|---|---|---|
+| `stores` | all 10k | all 10k (reference table) | all 10k (reference table) |
+| `products` | all 100k | ~50k (`store_id % 2 == 0`) | ~50k (`store_id % 2 == 1`) |
+| `skus` | all 300k | ~150k (follows products) | ~150k (follows products) |
+| `users` | all 20k | — | — |
+| `orders` | all 2M | — | — |
+| `order_items` | all 6M | — | — |
+
+**Stores are a reference table** — duplicated across all shards so FK constraints hold (`products.store_id → stores.id`). Products and SKUs use **explicit IDs** in the seed so all databases share the same ID space (each shard's auto-increment sequence would otherwise diverge and break FK lookups). Shard replicas receive data via streaming replication from their shard primary.
 
 ### 4. Start the dev server
 
@@ -126,7 +150,6 @@ All flags are off by default. Toggle via env vars.
 | `FEATURE_REDIS_CACHE` | Cache-aside for product reads. Keys scoped to `store_id`. |
 | `FEATURE_SHARDING` | Route product/order writes to shard by `store_id % 2` |
 | `FEATURE_RATE_LIMIT` | Sliding window rate limiting (not yet implemented) |
-| `FEATURE_DISTRIBUTED_LOCKS` | Redlock on order placement (always active for orders) |
 
 ## DB Routing
 
