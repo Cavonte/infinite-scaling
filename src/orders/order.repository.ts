@@ -28,10 +28,23 @@ export const orderRepository = {
 		const rows = await sql<Sku[]>`
 			UPDATE skus
 			SET supply = supply - ${quantity}
-			WHERE id = ${skuId} AND supply >= ${quantity}
+			WHERE id = ${skuId}
+			AND supply >= ${quantity}
 			RETURNING id, supply
 		`;
 		return rows[0] ?? null;
+	},
+
+	async incrementSupply(
+		skuId: number,
+		quantity: number,
+		sql: TxSql,
+	): Promise<void> {
+		await sql`
+			UPDATE skus
+			SET supply = supply + ${quantity}
+			WHERE id = ${skuId}
+		`;
 	},
 
 	async createOrder(

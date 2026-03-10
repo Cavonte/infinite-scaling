@@ -9,9 +9,9 @@ import { userRoutes } from "./users/user.routes.js";
 
 const app = new Hono();
 
-app.route("/orders", orderRoutes);
+app.route("/", orderRoutes);
 app.route("/users", userRoutes);
-app.route("/products", productRoutes);
+app.route("/", productRoutes);
 
 app.get("/health", (c) => {
 	return c.json({ status: "ok" });
