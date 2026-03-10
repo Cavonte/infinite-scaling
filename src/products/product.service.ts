@@ -1,90 +1,110 @@
 import { features } from "../config/features.js";
-import { getRedis } from "../lib/redis.js";
+import { delKeys, delPattern, getKey, setKey } from "../lib/redis.js";
 import {
 	productRepository,
 	type CreateProductInput,
 	type UpdateProductInput,
 } from "./product.repository.js";
 
-const CACHE_TTL_SECONDS = 600;
+const CACHE_TTL_SECONDS = 60;
 const KEYS = {
-	list: "products:listed",
-	product: (id: number) => `products:${id}`,
+	listKey: (storeId: number, limit: number, cursor?: number) =>
+		`products:store:${storeId}:listed:cursor:${cursor ?? 0}:limit:${limit}`,
+	listPattern: (storeId: number) => `products:store:${storeId}:listed:*`,
+	product: (productId: number) => `products:${productId}`,
 } as const;
 
 export const productService = {
-	async listProducts(limit: number, offset: number) {
+	async listProducts(storeId: number, limit: number, cursor?: number) {
 		if (features.redisCache) {
-			console.log("Reading From Redis");
-			const key = `${KEYS.list}:offset:${offset}:limit:${limit}`;
-			const cached = await getRedis().get(key);
+			console.log("Cache Hit");
+			const key = KEYS.listKey(storeId, limit, cursor);
+			const cached = await getKey(key);
 			if (cached) return JSON.parse(cached);
 		}
 
-		const products = await productRepository.findAllListed(limit, offset);
+		const products = await productRepository.findAllListed(
+			storeId,
+			limit,
+			cursor,
+		);
 
 		if (features.redisCache) {
-			const key = `${KEYS.list}:offset:${offset}:limit:${limit}`;
-			getRedis()
-				.set(key, JSON.stringify(products), "EX", CACHE_TTL_SECONDS)
-				.catch((err) => console.error("Cache write failed:", err));
+			setKey(
+				KEYS.listKey(storeId, limit, cursor),
+				JSON.stringify(products),
+				CACHE_TTL_SECONDS,
+			);
 		}
 
 		return products;
 	},
 
-	async getByid(id: number, forcePrimary: boolean = false) {
+	async getByid(
+		storeId: number,
+		productId: number,
+		forcePrimary: boolean = false,
+	) {
 		if (features.redisCache) {
-			console.log("Reading From Redis");
-			const cached = await getRedis().get(KEYS.product(id));
+			const cached = await getKey(KEYS.product(productId));
 			if (cached) return JSON.parse(cached);
 		}
 
 		const product = forcePrimary
-			? await productRepository.findByIdPrimary(id)
-			: await productRepository.findById(id);
-		if (!product) throw new Error(`Product ${id} not found`);
+			? await productRepository.findByIdPrimary(storeId, productId)
+			: await productRepository.findById(storeId, productId);
+		if (!product) throw new Error(`Product ${productId} not found`);
 
 		if (features.redisCache) {
-			getRedis()
-				.set(KEYS.product(id), JSON.stringify(product), "EX", CACHE_TTL_SECONDS)
-				.catch((err) => console.error("Cache write failed:", err));
+			setKey(
+				KEYS.product(productId),
+				JSON.stringify(product),
+				CACHE_TTL_SECONDS,
+			);
 		}
 
 		return product;
 	},
 
-	async createProduct(input: CreateProductInput) {
+	async createProduct(storeId: number, input: CreateProductInput) {
 		if (!input.name?.trim()) throw new Error("name is required");
-		if (!input.storeId) throw new Error("storeId is required");
 		if (!input.price) throw new Error("price is required");
 
-		const product = await productRepository.create(input);
+		const product = await productRepository.create(storeId, input);
 
 		if (features.redisCache) {
-			await getRedis().del(KEYS.list);
+			delPattern(KEYS.listPattern(storeId));
 		}
 
 		return product;
 	},
 
-	async updateProduct(id: number, input: UpdateProductInput) {
-		const product = await productRepository.update(id, input);
-		if (!product) throw new Error(`Product ${id} not found`);
+	async updateProduct(
+		storeId: number,
+		productId: number,
+		input: UpdateProductInput,
+	) {
+		const product = await productRepository.update(storeId, productId, input);
+		if (!product) throw new Error(`Product ${productId} not found`);
 
 		if (features.redisCache) {
-			await getRedis().del(KEYS.product(id), KEYS.list);
+			//Todo cleaner way of doing this is to an a generation counter and use that in the product key.
+			// `products:listed:${gen}:offset:${offset}:limit:${limit}`,
+			// old keys will disappear eventually due to TTL
+			delKeys(KEYS.product(productId));
+			delPattern(KEYS.listPattern(storeId));
 		}
 
 		return product;
 	},
 
-	async deleteProduct(id: number) {
-		const deleted = await productRepository.delete(id);
-		if (!deleted) throw new Error(`Product ${id} not found`);
+	async deleteProduct(storeId: number, productId: number) {
+		const deleted = await productRepository.delete(storeId, productId);
+		if (!deleted) throw new Error(`Product ${productId} not found`);
 
 		if (features.redisCache) {
-			await getRedis().del(KEYS.product(id), KEYS.list);
+			delKeys(KEYS.product(productId));
+			delPattern(KEYS.listPattern(storeId));
 		}
 	},
 };

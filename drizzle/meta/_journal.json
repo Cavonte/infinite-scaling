@@ -8,6 +8,13 @@
       "when": 1771536392205,
       "tag": "0000_giant_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772761266965,
+      "tag": "0001_exotic_lyja",
+      "breakpoints": true
     }
   ]
 }

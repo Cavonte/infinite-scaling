@@ -3,13 +3,15 @@ import { Hono } from "hono";
 import { env } from "./config/env.js";
 import { db } from "./db/db_router.js";
 import { getRedis } from "./lib/redis.js";
+import { orderRoutes } from "./orders/order.routes.js";
 import { productRoutes } from "./products/product.routes.js";
 import { userRoutes } from "./users/user.routes.js";
 
 const app = new Hono();
 
+app.route("/", orderRoutes);
 app.route("/users", userRoutes);
-app.route("/products", productRoutes);
+app.route("/", productRoutes);
 
 app.get("/health", (c) => {
 	return c.json({ status: "ok" });
