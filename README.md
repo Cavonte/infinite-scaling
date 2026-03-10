@@ -1,4 +1,4 @@
-# Sample Large Scale Online Store
+# Multi-tenant e-commerce marketplace
 
 A progressive Node.js/TypeScript API exploring real-world scaling patterns in the context of an online store. 
 This is a demo and reference for read replicas, Redis caching, distributed locks, rate limiting and sharding.
