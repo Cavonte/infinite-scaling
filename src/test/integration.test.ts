@@ -1,3 +1,8 @@
+/**
+ * Generated test files
+ */
+
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { db } from "../db/db_router.js";
@@ -22,7 +27,6 @@ beforeAll(async () => {
 	await db.write`SELECT setval('products_id_seq', GREATEST((SELECT MAX(id) FROM products), 1))`;
 	await db.write`SELECT setval('skus_id_seq', GREATEST((SELECT MAX(id) FROM skus), 1))`;
 
-	// No stores API — insert directly
 	const [store] = await db.write<{ id: number }[]>`
 		INSERT INTO stores (name, description, category)
 		VALUES ('Integration Test Store', 'Created by integration tests', 'test')
