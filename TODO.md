@@ -44,6 +44,7 @@
 - [x] Run benchmark 4: + Replicas and Redis combined
 - [x] Documented results in `benchmark/RESULTS.md`
 - [x] Re-run with hot-key access pattern (80/20 split: top 200 products get 80% of traffic)
+- [x] Increase replica connection pool (max: 10 → 50) and retest replica saturation point
 - [x] Add list_products scenario to benchmark (paged, 100 req/s)
 
 ## Phase 6: Redis — Distributed Locks
