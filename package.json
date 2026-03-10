@@ -9,6 +9,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx --env-file=.env src/db/seed.ts",
+    "db:resupply": "tsx --env-file=.env src/db/resupply.ts",
     "lint": "biome check src/",
     "format": "biome format --write src/",
     "bench": "k6 run k6/products.bench.js",

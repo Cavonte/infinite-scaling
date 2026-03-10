@@ -243,3 +243,184 @@ The `update_product` result is the signal: p(95) dropped from 684ms (Redis-only)
 | Dropped iterations ≠ server failure | VU ceiling hit first — distinguish k6 config limits from actual server degradation |
 | VU count reveals headroom | 71 VUs at 6000 req/s = 8x headroom. Little's Law: VUs ≈ throughput × avg_latency |
 | list cache is throughput-insensitive | 50 keys, 600s TTL — hit rate stays ~100% from 100/s to 1000/s. Ceiling is Redis RTT. |
+
+---
+
+## Hot Standby Conflict Issue
+
+### What happened
+
+Running read replicas initially produced errors on the replica nodes:
+
+```
+ERROR: canceling statement due to conflict with recovery
+```
+
+These appeared under the default PostgreSQL hot standby configuration and caused queries to be aborted mid-flight.
+
+### Root cause
+
+PostgreSQL streaming replication works by continuously replaying WAL (Write-Ahead Log) records from the primary. When the primary runs VACUUM or UPDATE on rows that a replica query is currently reading, a conflict arises: the replica cannot apply the WAL record without potentially invalidating the in-progress query's snapshot.
+
+By default PostgreSQL resolves this conflict in favour of replication — it cancels the replica query immediately. This is correct behaviour for replicas meant to stay in sync, but it makes them unreliable as a read target under any write load.
+
+### Fix: `hot_standby_feedback`
+
+Two parameters were added to the replica startup in `docker/pg-replica/entrypoint.sh`:
+
+```bash
+exec gosu postgres postgres \
+  -c hot_standby_feedback=on \
+  -c max_standby_streaming_delay=30s
+```
+
+**`hot_standby_feedback=on`** — The replica sends the primary a heartbeat with its oldest active transaction XID. The primary uses this to delay vacuuming rows that the replica is still reading. This is the primary fix: it prevents the conflict from arising in the first place.
+
+**`max_standby_streaming_delay=30s`** — If a conflict does occur despite the above (e.g. a long-running replica query vs. a large bulk update), the replica waits up to 30 seconds before canceling the query instead of failing immediately. Makes behaviour more predictable and less brittle under burst write loads.
+
+### Trade-offs
+
+| Trade-off | Detail |
+|---|---|
+| Vacuum delay on primary | `hot_standby_feedback` can cause the primary to retain dead row versions longer than it otherwise would. Under heavy read load on replicas, this inflates table bloat on the primary. If replica queries are long-running, dead tuples accumulate. |
+| Replication lag tolerance | `max_standby_streaming_delay` allows the replica to fall slightly further behind the primary to protect in-flight queries. Under heavy sustained write load the replica may lag more than without this setting. |
+| Not a free lunch | These settings trade replication aggressiveness for query reliability. For reporting replicas (long queries) the trade-off is clearly worth it. For replicas under tight RPO requirements (disaster recovery, near-zero lag), you'd want to tune these conservatively or keep `hot_standby_feedback` off. |
+| Application-level mitigation | The db_router already has a fallback: if a replica query fails, it retries on the primary. `hot_standby_feedback` reduces how often that fallback fires but the safety net remains. |
+
+### Interview talking point
+
+> "Read replicas in hot standby mode can cancel queries when WAL replay conflicts with active snapshots. The default behaviour favours replication consistency over query availability. `hot_standby_feedback` inverts that priority: the replica tells the primary 'don't vacuum these rows yet, I'm still reading them.' The cost is slightly higher table bloat on the primary. For a read-scaling use case the trade-off is correct — query reliability matters more than vacuum aggressiveness. For a replica used as a failover standby with a tight RPO, you'd think twice."
+
+---
+
+---
+
+---
+
+# Suite 3 — Sharding (Write Distribution Across Two Shards)
+
+**Architecture change:** Products and SKUs are now sharded by `store_id % 2`. Shard-1 (port 5435) holds even store IDs; Shard-2 (port 5436) holds odd store IDs. Each shard has its own replica (5437/5438). The main primary is now dedicated to orders and users only.
+
+**Routes changed to store-scoped:**
+- `GET /stores/:storeId/products/` — list products for a store
+- `GET /stores/:storeId/products/:productId` — get product (routes to correct shard)
+- `PUT /stores/:storeId/products/:productId` — update product (routes to correct shard write)
+- `POST /stores/:storeId/orders` — place order (Redlock + 2-phase commit: shard tx + primary tx)
+
+**New scenario added:** `place_order` at 50/s — Redlock acquires per-user + per-SKU locks in Redis, then executes a 2-phase commit: decrement SKU supply on the shard, create order record on the primary. 409 on lock contention (Redlock retries exhausted).
+
+**Goal:** Validate two hypotheses:
+1. Sharding routes product writes to independent shard primaries, leaving the main primary uncontested for order writes.
+2. Measure the overhead of distributed transactions (Redlock + cross-node 2-phase commit) at moderate order rates.
+
+**k6 scenario pools:**
+- `get_product`: 80/20 hot-key — products 1–200 (stores 1–20), 20% uniform random
+- `list_products`: stores 1–50, limit=30 — cache warms within first second, ~100% hit rate
+- `update_product`: products 1201–2200 (stores 121–220) — separated from hot read pool
+- `place_order`: products 2201–6200 (stores 221–620, 12 000 SKUs) — large pool keeps per-SKU lock contention low at 50/s
+
+---
+
+## Suite 3 Summary
+
+| Run | get p(95) | list p(95) | update p(95) | order p(95) | Dropped | Avg VUs |
+|---|---|---|---|---|---|---|
+| Baseline (no features) | 858ms ❌ | 856ms ✅ | 858ms ❌ | 2.89s ❌ | 151,038 | 746 (maxed) |
+| Read Replicas only | 2s ❌ | 1.93s ❌ | 764ms ❌ | 2.42s ❌ | 149,053 | 750 (maxed) |
+| Redis + Read Replicas | 209ms ✅ | 40ms ✅ | 344ms ✅ | 1.02s ❌ | 7,099 | 194 |
+| Redis + Replicas + Sharding | 5.96ms ✅ | 794µs ✅ | 4.05ms ✅ | 9.91ms ✅ | 542 | 8 |
+
+Charts below use a **logarithmic scale** — the All Features bars would be invisible on a linear scale.
+
+![Average response time](average.png)
+![p(95) response time](p95.png)
+
+---
+
+## Suite 3 — Round 1: Baseline (no features)
+
+**Load:** get_product 5000/s + list_products 1000/s + update_product 200/s + place_order 50/s
+**Features:** none
+
+| Metric | get_product | list_products | update_product | place_order |
+|---|---|---|---|---|
+| med | 559ms | 560ms | 557ms | 2.31s |
+| p(90) | 775ms | 777ms | 771ms | 2.72s |
+| p(95) | 858ms ❌ | 856ms ✅ | 858ms ❌ | 2.89s ❌ |
+
+**Dropped: 151,038 / ~187k (81%). VUs: 746/750 maxed.**
+
+The primary pool is `max: 10`. At 6,250 req/s those 10 connections are immediately exhausted — the ~560ms median is queue wait, not query time. `place_order` is worse because each order holds a connection for Redlock + 2-phase commit on top of the read flood. `list_products` technically passes its 1s threshold but the underlying numbers are identical to the other scenarios.
+
+---
+
+## Suite 3 — Round 2: Read Replicas only (no cache, no sharding)
+
+**Load:** get_product 5000/s + list_products 1000/s + update_product 200/s + place_order 50/s
+**Features:** `FEATURE_READ_REPLICAS=true`
+
+| Metric | get_product | list_products | update_product | place_order |
+|---|---|---|---|---|
+| med | 247ms | 271ms | 75ms | 635ms |
+| p(90) | 1.36s | 1.43s | 616ms | 1.86s |
+| p(95) | 2s ❌ | 1.93s ❌ | 764ms ❌ | 2.42s ❌ |
+
+**Dropped: 149,053 / ~187k (80%). VUs: 750/750 maxed.**
+
+Worse than baseline. Replicas move reads off the primary but don't reduce query volume — every request still generates a DB round-trip. WAL replay competes with query execution on the replicas, so each query is slower than on the primary. Slower queries hold connections longer, latency climbs, and the drop rate stays at 80%. Replicas are a write-offload tool — without cache cutting query volume first, adding them just moves the problem.
+
+---
+
+## Suite 3 — Round 3: Redis + Read Replicas (no sharding)
+
+**Load:** get_product 5000/s + list_products 1000/s + update_product 200/s + place_order 50/s
+**Features:** `FEATURE_READ_REPLICAS=true FEATURE_REDIS_CACHE=true`
+
+| Metric | get_product | list_products | update_product | place_order |
+|---|---|---|---|---|
+| med | 9.24ms | 6.71ms | 17.86ms | 136ms |
+| p(90) | 92.37ms | 28.27ms | 186.56ms | 821ms |
+| p(95) | 209ms ✅ | 40ms ✅ | 344ms ✅ | 1.02s ❌ |
+
+**Dropped: 7,099. VUs: avg 194, max 485.**
+
+Cache absorbs ~80% of `get_product` — hot 200 keys warm in the first second, served from Redis in ~70µs. DB query volume drops enough that replicas stop saturating and VUs fall from 750 to 194. `list_products` at 40ms shows near-total cache coverage on 50 page keys.
+
+`place_order` misses by 20ms. It doesn't benefit from cache — it's a write. At 50 orders/s, each order holds a primary connection for Redlock + 2-phase commit while competing with `update_product` writes. That contention is what sharding fixes.
+
+---
+
+## Suite 3 — Round 4: Redis + Replicas + Sharding
+
+**Load:** get_product 5000/s + list_products 1000/s + update_product 200/s + place_order 50/s
+**Features:** `FEATURE_READ_REPLICAS=true FEATURE_REDIS_CACHE=true FEATURE_SHARDING=true`
+
+| Metric | get_product | list_products | update_product | place_order |
+|---|---|---|---|---|
+| med | 250µs | 226µs | 1.96ms | 6.2ms |
+| p(90) | 4.66ms | 560µs | 3.21ms | 7.81ms |
+| p(95) | 5.96ms ✅ | 794µs ✅ | 4.05ms ✅ | 9.91ms ✅ |
+
+**Dropped: 542. VUs: avg 8, max 14. All thresholds passed. Checks: 100%. ✅**
+**Throughput: 6,230 req/s sustained.**
+
+All four pass. `update_product` now routes to shard primaries, so the main primary handles only order writes. With no competing writes, `place_order` median drops from 136ms to 6.2ms. The avg VU count of 8 at 6,250 req/s means the server is never backlogged — requests complete before new ones pile up.
+
+| Layer | Bottleneck removed | place_order p(95) | get p(95) |
+|---|---|---|---|
+| Baseline | — | 2.89s | 858ms |
+| + Read Replicas | nothing — same query volume | 2.42s | 2s |
+| + Redis Cache | ~80% of reads eliminated | 1.02s | 209ms |
+| + Sharding | primary write contention | **9.91ms** | **5.96ms** |
+
+---
+
+## Suite 3 Key Takeaways
+
+| Finding | Detail |
+|---|---|
+| Replicas need cache first | Without cache, replicas don't reduce query volume — they just move it. Made things worse here. |
+| Cache eliminates load, not just speeds it up | 80% of get_product never hit the DB. That's what made replicas viable. |
+| Sharding isolates write paths | Product writes on shard primaries freed the main primary for orders. place_order p(95): 1.02s → 9.91ms. |
+| VU count is the best health signal | 8 avg VUs at 6250 req/s = server is never backlogged. 750 VUs at the same load = it can't keep up. |
+| Distributed transactions are cheap when uncontested | Redlock + 2-phase commit ran in 6.2ms median once the primary had no competing writes. Contention was the cost, not the mechanism. |

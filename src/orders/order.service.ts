@@ -15,6 +15,13 @@ export class OrderConflictError extends Error {
 	}
 }
 
+export class InsufficientStockError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "InsufficientStockError";
+	}
+}
+
 const redlock = new Redlock([getRedis()], {
 	retryCount: 3,
 	retryDelay: 100,
@@ -56,7 +63,7 @@ export const orderService = {
 				// Promise all is not ideal here
 				for (const item of items) {
 					const sku = await orderRepository.decrementSupply(item.skuId, item.quantity, tx);
-					if (sku === null) throw new Error(`Insufficient stock for SKU ${item.skuId}`);
+					if (sku === null) throw new InsufficientStockError(`Insufficient stock for SKU ${item.skuId}`);
 				}
 			});
 

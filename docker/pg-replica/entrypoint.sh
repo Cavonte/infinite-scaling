@@ -27,4 +27,10 @@ fi
 chown -R postgres:postgres "$PGDATA"
 
 # Start postgres in standby mode
-exec gosu postgres postgres
+# hot_standby_feedback: tell primary which rows replicas are reading → primary delays
+#   vacuuming those rows → eliminates "canceling statement due to conflict with recovery"
+# max_standby_streaming_delay: if a conflict does occur, wait up to 30s before
+#   canceling the query (instead of the default 30s, this makes it explicit)
+exec gosu postgres postgres \
+  -c hot_standby_feedback=on \
+  -c max_standby_streaming_delay=30s
