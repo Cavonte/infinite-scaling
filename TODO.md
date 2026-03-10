@@ -30,6 +30,9 @@
 - [x] Implement cache-aside for `GET /products/:id` and `GET /products`
 - [x] Implement cache invalidation on product create/update/delete
 - [x] Test: verified cache hit/miss behavior via benchmarks
+- [x] Add pagination for `GET /products` and `GET /users` — previously returned full table, not benchmarkable at scale
+- [x] Replace OFFSET pagination with cursor-based (`WHERE id > $lastId`) — OFFSET forces a full index scan up to the offset point, degrades linearly at depth
+- [x] Fault-tolerance on Redis `get` — cache `set` is wrapped in `.catch` but `get` calls are not; a Redis failure breaks the request instead of falling back to DB
 - [ ] Failure scenario: kill Redis — does the app degrade gracefully or crash?
 
 ## Phase 5.5: Benchmark — Baseline vs Read Replicas vs Redis
@@ -40,7 +43,6 @@
 - [x] Run benchmark 3: + Redis cache
 - [x] Run benchmark 4: + Replicas and Redis combined
 - [x] Documented results in `benchmark/RESULTS.md`
-
 - [x] Re-run with hot-key access pattern (80/20 split: top 200 products get 80% of traffic)
 - [x] Increase replica connection pool (max: 10 → 50) and retest replica saturation point
 - [x] Add list_products scenario to benchmark (paged, 100 req/s)
@@ -48,13 +50,13 @@
 ## Phase 6: Redis — Distributed Locks
 - [x] Implement Redlock pattern for order submission
 - [x] Prevent double-order: acquire lock on `store:order:customer_id`
+- [x] Lock supply through Red lock
 - [x] Test: concurrent order submissions, only one succeeds
 
 ## Phase 7: Sharding
 - [x] Create shard map config (`store_id % 2` routing in `db_router.ts`, `db.shard(storeId).read/write`)
 - [x] Update Docker Compose to run multiple PG instances (pg-shard-1/2 + replicas on ports 5435-5438)
-- [x] Run migrations across all shards
-- [x] Seed shards: stores as reference table (duplicated), products/skus distributed by store_id, explicit IDs to prevent sequence divergence
+- [x] Run migrations across all shards and Seed shards: stores as reference table (duplicated), products/skus distributed by store_id, explicit IDs to prevent sequence divergence
 - [x] Test: placed orders against even/odd stores, verified SKU decrement on correct shard + order on primary
 - [x] Order flow: two-transaction saga — tx1 decrementSupply on shard, tx2 createOrder on primary, compensation on failure
 - [x] Dropped `orders.user_id` FK — user existence validated at app layer before lock acquisition
@@ -68,7 +70,7 @@
 
 ## Phase 9: Polish & Interview Prep
 - [ ] Add API documentation / route summary
-- [ ] Write README with architecture diagram and trade-offs per module
+- [x] Write README with architecture diagram and trade-offs per module
 - [ ] Prepare talking points for each scaling pattern (see system_design_drills.md)
 - [ ] Document one real failure you encountered per phase and how you fixed it
 - [ ] Summarize benchmark results with before/after comparisons
