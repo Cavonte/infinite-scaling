@@ -8,6 +8,19 @@ Products and orders are scoped to stores, enabling shard routing by `store_id`.
 
 See outcomes and analysis in the `benchmark/` folder.
 
+## Architecture
+
+![System Diagram](./System%20Diagram.png)
+
+Traffic flows DNS → Load Balancer → API Gateway and fans out to three service paths:
+
+- **Product Service** — cache-aside via Redis (list + single product), sharded reads/writes to Postgres by `store_id % 2`, each shard with a read replica
+- **Order Service** — acquires distributed locks (Redlock/Redis) on SKU and user before executing two-phase writes: decrement supply on the product shard, then commit the order record on the primary. Supply is compensated if the order commit fails.
+- **User Service** — unsharded, reads from primary replicas with primary fallback
+
+> The system is implemented as a monolith but is designed as if each service were independently deployable.
+> This codebase does not contain the DNS, the LB and the API Gateway. There fore illustrative purposes.
+
 ## Stack
 
 - **Runtime**: Node.js, TypeScript (ESM), tsx, pnpm
