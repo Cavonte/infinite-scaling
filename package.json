@@ -13,10 +13,6 @@
     "lint": "biome check src/",
     "format": "biome format --write src/",
     "bench": "k6 run k6/products.bench.js",
-<<<<<<< HEAD
-    "bench:shard": "k6 run k6/products.bench.js",
-=======
->>>>>>> 7650c4e1d689c79df542afef4399b84f473dbb7f
     "test": "vitest run"
   },
   "keywords": [],
