@@ -21,8 +21,9 @@ function read<T extends postgres.Row[] = postgres.Row[]>(
 		return main<T>(strings, ...values);
 	}
 
-	const replica = replicas[(replicaCounter + 1) % replicas.length];
-	console.log(`[db_router] read → replica ${replicaCounter}`);
+	const replicaIndex = replicaCounter++ % replicas.length;
+	const replica = replicas[replicaIndex];
+	console.log(`[db_router] read → replica ${replicaIndex}`);
 
 	return replica<T>(strings, ...values).catch((err: Error) => {
 		console.warn(
@@ -33,7 +34,7 @@ function read<T extends postgres.Row[] = postgres.Row[]>(
 }
 
 export type ShardDb = {
-	read: typeof read;
+	read: postgres.Sql;
 	write: postgres.Sql;
 };
 

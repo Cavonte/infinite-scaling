@@ -1,0 +1,35 @@
+Average Response Time (ms),,,,
+Scenario,Baseline,Read Replicas,Replicas + Cache,All Features (Sharding)
+get_product,584,529,44.16,1.45
+list_products,586,539,13.44,0.56
+place_order,192,837,295.48,7.93
+update_product,584,189,66.02,2.73
+
+Median Response Time (ms),,,,
+Scenario,Baseline,Read Replicas,Replicas + Cache,All Features (Sharding)
+get_product,559,248,9.24,0.25
+list_products,560,271,6.71,0.23
+place_order,2310,635,136.2,6.2
+update_product,557,75,17.86,1.96
+
+p(90) Response Time (ms),,,,
+Scenario,Baseline,Read Replicas,Replicas + Cache,All Features (Sharding)
+get_product,775,1360,92.37,4.66
+list_products,777,1430,28.27,0.56
+place_order,2720,1860,821.22,7.81
+update_product,771,616,186.56,3.21
+
+p(95) Response Time (ms),,,,
+Scenario,Baseline,Read Replicas,Replicas + Cache,All Features (Sharding)
+get_product,858,2000,209.22,5.96
+list_products,856,1930,40.51,0.79
+place_order,2890,2420,1020,9.91
+update_product,858,765,343.82,4.05
+
+Dropped Iterations,,,,
+Scenario,Baseline,Read Replicas,Replicas + Cache,All Features (Sharding)
+All scenarios,151038,149053,7099,542
+
+Peak VUs,,,,
+Scenario,Baseline,Read Replicas,Replicas + Cache,All Features (Sharding)
+All scenarios,750,750,485,14
