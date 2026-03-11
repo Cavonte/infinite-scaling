@@ -6,6 +6,8 @@
 
 ---
 
+# Suite 1 - Large Read Operations 
+
 ## Results Summary
 
 | Run | Load | Access pattern | p(95) | vs Baseline |
@@ -82,12 +84,6 @@ Primary never hit this: consistent ~5ms kept pool usage at ~4.5/10. VUs climbing
 
 80% of `get_product` traffic targets 200 IDs. At 600s TTL those keys warm in the first second and stay warm for the entire 30s run. Effective hit rate ~80% vs ~27% under uniform random.
 
-The bimodal distribution is visible in the numbers: **med = 120µs** (Redis hit) vs **p(95) = 5.55ms** (DB miss). The gap between them is the cost of a Postgres round-trip.
-
-### list_products — near-total cache coverage
-
-100 req/s across 50 distinct page keys (`offset` 0–1470, `limit` 30). At 600s TTL all 50 keys warm within the first second. **p(95) = 264µs** — effectively every request is a cache hit. This is the ceiling for what Redis cache-aside can deliver on a listing endpoint.
-
 ### Async cache writes
 
 Removing `await` from the cache `SET` path means the response no longer blocks on the Redis round-trip after a DB miss. Effect is most visible at the median and average — tail latency (p(95)) is dominated by the DB query time regardless.
@@ -96,8 +92,7 @@ Removing `await` from the cache `SET` path means the response no longer blocks o
 
 ## Round 4 — 2000 req/s get_product, 500 req/s list_products
 
-**Features: Read replicas + Redis cache both enabled.** Same config as Round 3 (80/20 hot-key, async writes). Load doubled on both scenarios.
-
+**Features: Read replicas + Redis cache both enabled.**
 | Metric | get_product 1000/s | get_product 2000/s | list_products 100/s | list_products 500/s |
 |---|---|---|---|---|
 | med | 120µs | 166µs | 149µs | 176µs |
@@ -131,17 +126,6 @@ Removing `await` from the cache `SET` path means the response no longer blocks o
 | Dropped | 194 | 11 | — | — |
 | VUs used | 202 (hit ceiling) | 71 / 600 | — | — |
 
-### The VU number tells the real story
-
-At 6000 total req/s the server only needed **71 concurrent VUs** out of 600 available. Little's Law explains it:
-
-```
-VUs needed = throughput × avg_response_time
-           = 6000 req/s × 0.00104s = ~6.2 concurrent connections on average
-```
-
-71 VUs at peak accounts for variance and burst — but the system had 8x headroom. The Round 4 VU saturation (202 VUs at 2000/s) was a k6 config problem (`maxVUs: 200` too low), not server saturation.
-
 **list_products stays sub-millisecond at 1000 req/s** (p(95) = 929µs). 50 cached page keys, 600s TTL — hit rate stays ~100% regardless of req/s. The only constraint is Redis network round-trip.
 
 **get_product p(90) barely moved** (5.45ms → 5.46ms) despite 2.5x load. The 80% Redis-served hot keys are insensitive to throughput. p(95) crept up because the cold 20% (DB path) sees marginally more queue time at 5000/s.
@@ -155,14 +139,6 @@ VUs needed = throughput × avg_response_time
 | Pool | max: 10 | max: 50 |
 | Access | uniform random | 80/20 hot-key |
 | Cache writes | synchronous | async (fire-and-forget) |
-
-Three compounding changes turned a degraded result into the best one in the suite. The pool fix prevented the saturation cascade; the 80/20 pattern reduced replica DB load by ~80%; async writes removed the SET overhead from the response path.
-
-**11 dropped iterations** out of 179,992 (0.006%) — noise. The server is not approaching its limit.
-
-### Where the actual ceiling is
-
-The local setup constraints at this point are: Node.js single-threaded event loop, local container networking latency, and the laptop's CPU. The DB and Redis are not the bottleneck — the cache is absorbing ~80% of get_product load and ~100% of list load. To find the real server ceiling, the next variable to change is horizontal scaling (multiple Node.js processes) or moving off local Docker.
 
 ---
 
@@ -196,8 +172,6 @@ The local setup constraints at this point are: Node.js single-threaded event loo
 
 **Dropped: 136,007 / ~186k. VUs: 676/700.**
 
-All three scenarios share the same primary pool. Writes hold connections longer (WAL flush); reads queue behind them. The ~400ms median across all scenarios is connection wait time, not query time — the pool is exhausted. 136k dropped iterations confirm the server fell behind immediately.
-
 ---
 
 ## Suite 2 — Round 2: Redis cache (no replicas)
@@ -211,7 +185,7 @@ All three scenarios share the same primary pool. Writes hold connections longer 
 
 **Dropped: 6,566. Avg VUs: 13.**
 
-Cache absorbed ~80% of read load — VUs collapsed from 676 to 13. `get_product` med (755µs) vs p(95) (468ms) shows the bimodal split: hot cache hits vs cold misses hitting the DB. `update_product` p(95) is unchanged at 684ms — writes bypass cache and still compete with cold reads on the primary. That remaining tail is what replicas should fix.
+Cache absorbed ~80% of read load — VUs collapsed from 676 to 13. `get_product` med (755µs) vs p(95) (468ms) shows the bimodal split: hot cache hits vs cold misses hitting the DB. `update_product` p(95) is unchanged at 684ms.
 
 ---
 
@@ -257,6 +231,7 @@ ERROR: canceling statement due to conflict with recovery
 ```
 
 These appeared under the default PostgreSQL hot standby configuration and caused queries to be aborted mid-flight.
+
 
 ### Root cause
 

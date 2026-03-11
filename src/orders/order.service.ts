@@ -59,7 +59,7 @@ export const orderService = {
 
 			// tx1: decrement supply on the correct shard
 			await db.shard(storeId).write.begin(async (sql) => {
-				const tx = sql as TxSql;
+				const tx = sql as unknown as TxSql;
 				// Promise all is not ideal here
 				for (const item of items) {
 					const sku = await orderRepository.decrementSupply(item.skuId, item.quantity, tx);
@@ -70,13 +70,13 @@ export const orderService = {
 			// tx2: create order record on primary
 			try {
 				return await db.write.begin(async (sql) => {
-					const tx = sql as TxSql;
+					const tx = sql as unknown as TxSql;
 					return orderRepository.createOrder(userId, items, tx);
 				});
 			} catch (err) {
 				// Compensate: restore supply on shard if order creation failed
 				await db.shard(storeId).write.begin(async (sql) => {
-					const tx = sql as TxSql;
+					const tx = sql as unknown as TxSql;
 					for (const item of items) {
 						await orderRepository.incrementSupply(item.skuId, item.quantity, tx);
 					}
@@ -95,7 +95,7 @@ export const orderService = {
 				locks.map((lock) =>
 					lock
 						.release()
-						.catch((err) => console.warn("Failed to release lock:", err)),
+						.catch((err: unknown) => console.warn("Failed to release lock:", err)),
 				),
 			);
 		}

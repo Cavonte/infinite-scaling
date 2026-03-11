@@ -71,7 +71,6 @@ const scalingConfig = {
   readReplicas: false,
   redisCache: false,
   rateLimit: false,
-  distributedLocks: false,
 };
 ```
 Each layer checks its flag and either uses the scaling path or falls through to the simple path. Docker Compose always runs all containers — flags control routing only.
