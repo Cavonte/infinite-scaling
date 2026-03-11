@@ -72,6 +72,5 @@
 - [ ] Add API documentation / route summary
 - [x] Write README with architecture diagram and trade-offs per module
 - [x] Prepare talking points for each scaling pattern (see system_design_drills.md)
-- [ ] Document one real failure you encountered per phase and how you fixed it
-- [ ] Summarize benchmark results with before/after comparisons
+- [x] Summarize benchmark results with before/after comparisons
 

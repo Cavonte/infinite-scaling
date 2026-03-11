@@ -213,6 +213,10 @@ The `update_product` result is the signal: p(95) dropped from 684ms (Redis-only)
 | Pool saturation is a cascade | One slow query holds a connection; exhausted pool queues everything |
 | Async cache writes reduce avg/med | p(95) still floor'd by DB query time on misses |
 | Uniform random is a worst-case cache test | Real traffic has hot keys — always benchmark with a realistic distribution |
+| Cache scales better than the DB under hot-key load | 2x req/s → +11% p(95). DB-only would scale linearly or worse. |
+| Dropped iterations ≠ server failure | VU ceiling hit first — distinguish k6 config limits from actual server degradation |
+| VU count reveals headroom | 71 VUs at 6000 req/s = 8x headroom. Little's Law: VUs ≈ throughput × avg_latency |
+| list cache is throughput-insensitive | 50 keys, 600s TTL — hit rate stays ~100% from 100/s to 1000/s. Ceiling is Redis RTT. |
 
 ---
 
@@ -225,6 +229,9 @@ Running read replicas initially produced errors on the replica nodes:
 ```
 ERROR: canceling statement due to conflict with recovery
 ```
+
+These appeared under the default PostgreSQL hot standby configuration and caused queries to be aborted mid-flight.
+
 
 ### Root cause
 
@@ -388,7 +395,7 @@ All four pass. `update_product` now routes to shard primaries, so the main prima
 | Finding | Detail |
 |---|---|
 | Replicas need cache first | Without cache, replicas don't reduce query volume — they just move it. Made things worse here. |
-| Cache eliminates load, not just speeds it up | 80% of get_product never hit the DB. |
+| Cache eliminates load, not just speeds it up | 80% of get_product never hit the DB. That's what made replicas viable. |
 | Sharding isolates write paths | Product writes on shard primaries freed the main primary for orders. place_order p(95): 1.02s → 9.91ms. |
 | VU count is the best health signal | 8 avg VUs at 6250 req/s = server is never backlogged. 750 VUs at the same load = it can't keep up. |
 | Distributed transactions are cheap when uncontested | Redlock + 2-phase commit ran in 6.2ms median once the primary had no competing writes. Contention was the cost, not the mechanism. |
