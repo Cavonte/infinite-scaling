@@ -33,8 +33,14 @@ function read<T extends postgres.Row[] = postgres.Row[]>(
 	});
 }
 
+type SqlTag = <T extends postgres.Row[] = postgres.Row[]>(
+	strings: TemplateStringsArray,
+	// biome-ignore lint/suspicious/noExplicitAny: mirrors postgres.Sql variadic parameter signature
+	...values: any[]
+) => Promise<T>;
+
 export type ShardDb = {
-	read: postgres.Sql;
+	read: SqlTag;
 	write: postgres.Sql;
 };
 
