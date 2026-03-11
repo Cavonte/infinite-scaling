@@ -17,7 +17,6 @@ const KEYS = {
 export const productService = {
 	async listProducts(storeId: number, limit: number, cursor?: number) {
 		if (features.redisCache) {
-			console.log("Cache Hit");
 			const key = KEYS.listKey(storeId, limit, cursor);
 			const cached = await getKey(key);
 			if (cached) return JSON.parse(cached);
@@ -29,6 +28,7 @@ export const productService = {
 			cursor,
 		);
 
+		// 		Set key async
 		if (features.redisCache) {
 			setKey(
 				KEYS.listKey(storeId, limit, cursor),
